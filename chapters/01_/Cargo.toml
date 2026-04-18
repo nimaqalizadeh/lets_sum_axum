@@ -1,0 +1,13 @@
+[package]
+name = "chapter_01"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8.9"
+derive = "1.0.0"
+features = "0.10.0"
+serde = { version = "1.0.228", features = ["derive"] }
+tokio = { version = "1.52.1", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
