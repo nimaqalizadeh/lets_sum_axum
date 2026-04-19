@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew list *)",
+      "Bash(git -C /Users/darya/Desktop/github/lets_sum_axum status --porcelain)",
+      "Bash(git -C /Users/darya/Desktop/github/lets_sum_axum remote -v)",
+      "Bash(brew install *)",
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git filter-repo *)",
+      "Bash(git remote *)",
+      "Bash(cargo clean *)"
+    ]
+  }
+}
