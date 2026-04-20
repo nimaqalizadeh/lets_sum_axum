@@ -3,8 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Page not found - Let&#x27;s sum Axum</title>
-        <base href="/">
+        <title>How this maps back to Axum - Let&#x27;s sum Axum</title>
 
 
         <!-- Custom HTML head -->
@@ -175,13 +174,67 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="document-not-found-404"><a class="header" href="#document-not-found-404">Document not found (404)</a></h1>
-<p>This URL is invalid, sorry. Please use the navigation bar or search to continue.</p>
+                        <h1 id="how-this-maps-back-to-axum"><a class="header" href="#how-this-maps-back-to-axum">How this maps back to Axum</a></h1>
+<p>Stack up what we’ve covered against what happens when you run <code>axum::serve(listener, router).await</code>:</p>
+<ol>
+<li><strong><code>tokio::net::TcpListener::bind("0.0.0.0:3000")</code></strong> → <code>socket()</code> + <code>bind()</code> + <code>listen()</code>. You now own a listening fd with its SYN and accept queues.</li>
+<li><strong>Accept loop</strong> → <code>listener.accept().await</code> parks on <code>epoll</code> until the accept queue has something. When it does, Tokio wakes the task and the <code>accept()</code> syscall returns a per-connection fd.</li>
+<li><strong><code>tokio::spawn</code></strong> → that connection gets its own task, which can run on any worker thread. The accept loop goes right back to waiting.</li>
+<li><strong><code>hyper</code> drives I/O</strong> → reads bytes off the connection fd (each <code>read</code> is non-blocking; parks on <code>epoll</code> when the receive buffer is empty), parses HTTP, assembles a <code>Request</code>, hands it to the router.</li>
+<li><strong>Router → handler</strong> → your <code>async fn</code> runs. When <em>it</em> awaits (DB query, outbound HTTP), its task parks and the worker thread picks up someone else’s work.</li>
+<li><strong>Response</strong> → <code>hyper</code> serializes, <code>write</code>s into the send buffer. The kernel transmits (honoring <code>TCP_NODELAY</code> since Tokio sets it), and on HTTP/1.1 keep-alive the same connection goes back to step 4 for the next request.</li>
+<li><strong>Close</strong> → connection fd closed, FIN sent, task drops its allocations.</li>
+</ol>
+<p>Every part of this — the accept queue, the receive buffer, the epoll registration, the <code>TCP_NODELAY</code>, the non-blocking <code>read</code> — was invisible in the four-line <code>main</code> from the introduction. Now it isn’t.</p>
+<h2 id="makeservice-and-service-a-factory-per-connection-a-service-per-request"><a class="header" href="#makeservice-and-service-a-factory-per-connection-a-service-per-request">MakeService and Service: a factory per connection, a service per request</a></h2>
+<p><code>serve</code> takes a <code>MakeService</code> — a factory. Every time a new TCP connection is accepted, it calls this factory to produce a fresh <code>Service</code> dedicated to that connection:</p>
+<pre><code>Connection arrives ──► MakeService::call() ──► returns a Service
+                                                    │
+                        Request on that connection ─┴─► Service::call(req) ──► Response
+</code></pre>
+<p>Two layers:</p>
+<ul>
+<li><strong><code>MakeService</code></strong> — called once per connection.</li>
+<li><strong><code>Service</code></strong> — called once per request (potentially many times on one connection).</li>
+</ul>
+<p>The <code>Service</code> trait, from <code>tower</code>, is essentially:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>async fn call(&amp;mut self, req: Request) -&gt; Result&lt;Response, Error&gt;
+<span class="boring">}</span></code></pre>
+<p>An <code>axum::Router</code> implements both <code>MakeService</code> and <code>Service</code>, which is why you can hand one to <code>serve</code> directly.</p>
+<p>Per-connection services make connection-scoped state (e.g. an HTTP/2 stream counter, or per-connection middleware state) cheap: it can live in the service instance without locking. Shared state (DB pools, config) goes in <code>Arc</code>s held inside the router and cloned into each connection’s service.</p>
+<h2 id="where-memory-lives"><a class="header" href="#where-memory-lives">Where memory lives</a></h2>
+<ul>
+<li><strong>Per-connection state</strong> (hyper’s parser buffers, the <code>Service</code> instance): owned by the spawned task. Dropped when the connection closes.</li>
+<li><strong>Per-request state</strong> (parsed headers, body bytes, extractors, handler locals): lives on the task’s stack and heap during <code>service.call</code>. Dropped after the response is written.</li>
+<li><strong>Shared state</strong> (DB pools, config, caches): lives in <code>Arc</code>s held by the router and cloned cheaply into each per-connection service.</li>
+</ul>
+<h2 id="why-the-serve-trait-bounds-look-scary"><a class="header" href="#why-the-serve-trait-bounds-look-scary">Why the <code>serve</code> trait bounds look scary</a></h2>
+<p>The <code>where</code> clauses on <code>serve</code> — <code>Service&lt;Request&gt; + Send + 'static</code>, <code>S::Future: Send</code>, <code>Error = Infallible</code>, and friends — aren’t adding behavior. They exist because:</p>
+<ul>
+<li>Each connection runs in a <strong>spawned Tokio task</strong>, so everything crossing into it must be <code>Send + 'static</code>.</li>
+<li>The response must be a valid HTTP body that <code>hyper</code> can serialize.</li>
+<li>Errors must be convertible into something <code>hyper</code> can report (<code>Infallible</code> here means routing itself cannot fail — handler errors are turned into responses before they reach this layer).</li>
+</ul>
+<p>They’re the compiler’s way of making sure the types are actually shippable between threads and compatible with <code>hyper</code>’s I/O, nothing more.</p>
+<h2 id="what-this-should-change-about-how-you-write-handlers"><a class="header" href="#what-this-should-change-about-how-you-write-handlers">What this should change about how you write handlers</a></h2>
+<ul>
+<li><strong>Don’t block the runtime.</strong> Any synchronous, CPU-bound work longer than ~100µs stalls everything sharing that worker thread. Push it to <code>spawn_blocking</code> or a dedicated thread pool.</li>
+<li><strong>Stream, don’t buffer.</strong> Large request/response bodies held in memory throttle everyone via flow control and blow up RAM. Axum’s <code>Body</code> is a stream for a reason.</li>
+<li><strong>Respect back-pressure.</strong> If a downstream is slow, don’t <code>Vec::extend</code> your way into an OOM. Use bounded channels, <code>tower</code> rate-limiters, or <code>hyper::body</code>’s built-in flow control.</li>
+<li><strong>Keep connections alive.</strong> HTTP/1.1 keep-alive and HTTP/2 multiplexing mean one TCP handshake amortized across many requests. Don’t fight it by forcing <code>Connection: close</code> unless you really mean to.</li>
+<li><strong>Bind narrowly.</strong> <code>0.0.0.0</code> in production is a choice, not a default. If the service is internal, bind to a private interface.</li>
+</ul>
+<p>The rest of the book assumes this much background. When a later chapter says “the handler returns immediately but hyper is still writing the body,” or “extractors run in the order they appear because each one may park the task,” that’s this machinery in action.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="01_2_6.async_io.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
 
 
                         <div style="clear: both"></div>
@@ -190,6 +243,9 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="01_2_6.async_io.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
 
             </nav>
 

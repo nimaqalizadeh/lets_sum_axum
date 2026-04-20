@@ -3,8 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Page not found - Let&#x27;s sum Axum</title>
-        <base href="/">
+        <title>Socket programming patterns - Let&#x27;s sum Axum</title>
 
 
         <!-- Custom HTML head -->
@@ -175,14 +174,46 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="document-not-found-404"><a class="header" href="#document-not-found-404">Document not found (404)</a></h1>
-<p>This URL is invalid, sorry. Please use the navigation bar or search to continue.</p>
+                        <h1 id="socket-programming-patterns"><a class="header" href="#socket-programming-patterns">Socket programming patterns</a></h1>
+<p>Once you have sockets and connections, you have choices about <em>who does what</em>. A server has several logically distinct jobs:</p>
+<ul>
+<li><strong>Listener</strong> — owns the listening socket. One per <code>(IP, port)</code> (or N with <code>SO_REUSEPORT</code>).</li>
+<li><strong>Acceptor</strong> — calls <code>accept()</code> in a loop, produces connection fds.</li>
+<li><strong>Reader</strong> — calls <code>read()</code> on connection fds, drains bytes into userspace.</li>
+<li><strong>Parser</strong> — turns raw bytes into protocol-level messages (HTTP requests, gRPC frames).</li>
+<li><strong>Decryptor</strong> — TLS encrypt/decrypt, when applicable.</li>
+<li><strong>Worker</strong> — runs your actual handler. The part that queries the database, computes the response.</li>
+</ul>
+<p>Different servers slice these roles differently, and the slicing is how you scale (or don’t).</p>
+<h2 id="nodejs-one-thread-does-everything"><a class="header" href="#nodejs-one-thread-does-everything">Node.js: one thread does everything</a></h2>
+<p>The main Node event loop is a single thread running listener + acceptor + reader + parser + worker for most operations. <code>libuv</code> offloads a few things to a small thread pool (file I/O, DNS, crypto), but HTTP request handling is single-threaded. CPU-bound handlers block the loop and stall <em>every</em> other connection. This is why “don’t do CPU work on the main thread” is such a drilled-in Node rule.</p>
+<h2 id="memcached-one-acceptor-many-readers"><a class="header" href="#memcached-one-acceptor-many-readers">memcached: one acceptor, many readers</a></h2>
+<p>memcached has one thread listening + accepting, and a pool of worker threads. Accepted connections are handed off (via IPC or shared memory) to worker threads, which own reading, parsing, and serving from that point on. Keeps acceptance latency low; parallelizes request handling.</p>
+<h2 id="ram-cloud-one-pipeline-many-workers"><a class="header" href="#ram-cloud-one-pipeline-many-workers">RAM cloud: one pipeline, many workers</a></h2>
+<p>Listener + acceptor + reader + parser + decryptor all in a single thread that produces request <em>objects</em>. Those objects get dispatched to a pool of worker threads. The I/O path stays cache-hot on one core; the CPU-bound handlers spread across the rest.</p>
+<h2 id="nginx-many-workers-shared-socket"><a class="header" href="#nginx-many-workers-shared-socket">Nginx: many workers, shared socket</a></h2>
+<p>Nginx forks N worker processes that all <code>accept()</code> on the same listening socket (or, with <code>reuseport on;</code>, each has its own via <code>SO_REUSEPORT</code>). Each worker owns a subset of connections end-to-end. The shared-socket variant hits the accept-queue mutex under load; the <code>SO_REUSEPORT</code> variant doesn’t. For very high connection rates, the latter wins.</p>
+<h2 id="where-axum--tokio-fits"><a class="header" href="#where-axum--tokio-fits">Where Axum + Tokio fits</a></h2>
+<p>A multi-threaded Tokio runtime sits between Node and nginx. By default:</p>
+<ul>
+<li>One OS thread per core runs a worker.</li>
+<li>Each worker has its own <code>epoll</code> instance, its own ready queue, its own task scheduler.</li>
+<li><code>listener.accept().await</code> on a shared <code>TcpListener</code> can be called from any worker; Tokio arranges fair distribution of accepted connections (work-stealing).</li>
+<li>Your handler <code>.await</code>s are cooperative yield points; when one parks, the thread runs another task.</li>
+</ul>
+<p>So you get nginx-style parallelism (N cores truly in use) with Node-style ergonomics (one <code>async fn</code> per request, no thread-per-connection overhead). The <code>SO_REUSEPORT</code> trick is still available if you want truly independent accept queues.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="01_2_4.sending_receiving.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
 
+                            <a rel="next prefetch" href="01_2_6.async_io.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -190,7 +221,13 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="01_2_4.sending_receiving.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
 
+                    <a rel="next prefetch" href="01_2_6.async_io.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
             </nav>
 
         </div>

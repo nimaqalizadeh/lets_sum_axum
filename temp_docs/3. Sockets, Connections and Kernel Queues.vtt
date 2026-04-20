@@ -1,0 +1,1645 @@
+WEBVTT
+
+00:00.110 --> 00:00.890
+All right.
+
+00:00.890 --> 00:02.780
+Welcome to the nitty gritty.
+
+00:03.530 --> 00:07.760
+We'll talk about connections, sockets and queues.
+
+00:07.850 --> 00:11.180
+And I'll split this into two lectures.
+
+00:11.180 --> 00:14.150
+The first part we'll talk about the.
+
+00:14.300 --> 00:18.650
+In both cases we'll talk about the core kernel network data structures.
+
+00:19.340 --> 00:25.100
+But in this particular thing I'm going to talk about the sockets and connections.
+
+00:25.100 --> 00:32.090
+And then in the next one we'll talk about specifically how to read from connections and what kernel
+
+00:32.090 --> 00:36.260
+data structures does the kernel use to actually implement that.
+
+00:36.410 --> 00:38.150
+Let's jump into it.
+
+00:38.150 --> 00:41.270
+This is going to be a beautiful ride.
+
+00:41.390 --> 00:44.030
+Let's just swim you guys here.
+
+00:44.030 --> 00:47.450
+Let's swim and don't memorize anything.
+
+00:47.810 --> 00:48.680
+Just swim.
+
+00:50.050 --> 00:50.920
+So.
+
+00:53.610 --> 00:58.080
+First concept concept of a socket and a socket.
+
+00:58.080 --> 00:58.890
+Really.
+
+00:59.370 --> 01:03.600
+When it comes to actual data, structure is nothing but a struct.
+
+01:03.690 --> 01:05.790
+A struct really in C?
+
+01:08.900 --> 01:13.760
+But it's also a file descriptor, at least in Linux.
+
+01:14.450 --> 01:14.930
+No.
+
+01:15.290 --> 01:17.240
+In windows, it becomes an object.
+
+01:18.110 --> 01:21.620
+Because in Linux everything is a is a file.
+
+01:22.100 --> 01:25.850
+But what happens here is.
+
+01:26.760 --> 01:31.890
+When I listen and we talked about what is the concept of listening, right.
+
+01:31.890 --> 01:42.090
+And the fundamentals like, hey, I want to accept connections on a specific IP address and a specific
+
+01:42.090 --> 01:42.930
+port.
+
+01:44.540 --> 01:46.340
+Hussein, use the word specific.
+
+01:46.340 --> 01:48.710
+Can I have more than an IP address in one machine?
+
+01:48.740 --> 01:49.910
+Of course.
+
+01:50.630 --> 01:52.850
+In every computer.
+
+01:52.850 --> 01:57.410
+You have multiple NICs or network interface cards.
+
+01:58.640 --> 02:06.020
+And not only that, you can technically create unlimited Virtual Network interface card, each with
+
+02:06.020 --> 02:07.790
+its own IP address.
+
+02:08.550 --> 02:10.350
+Because that's all you know.
+
+02:11.720 --> 02:21.260
+You can do anything you want, but ideally you have a physical network and you have a mapped mount which
+
+02:21.260 --> 02:27.380
+have essentially that network, uh, virtual IP, not virtual IP.
+
+02:27.380 --> 02:27.800
+Sorry.
+
+02:27.950 --> 02:32.570
+Uh, it will have a neck exposed to you that you say, hey, this is my IP address.
+
+02:32.570 --> 02:33.920
+This is my subnet mask.
+
+02:33.920 --> 02:37.820
+This is my, uh, default gateway.
+
+02:37.820 --> 02:42.740
+This is my DNS resolver, IP address, all of that.
+
+02:42.740 --> 02:43.820
+It's my proxy.
+
+02:43.820 --> 02:44.900
+Stuff like that.
+
+02:44.900 --> 02:45.230
+Yeah.
+
+02:45.590 --> 02:51.140
+So you can listen on an IP and a port.
+
+02:51.140 --> 02:53.330
+It has to be those two things, right?
+
+02:54.420 --> 02:57.810
+So that means I have four network cards.
+
+02:57.810 --> 03:00.480
+I'm listening on the IP address of this network card.
+
+03:00.480 --> 03:04.950
+You have to specify it, you know, and then you specify the port.
+
+03:04.950 --> 03:11.730
+And if you're if you've ever built a back end, you'll always see that the default is, I don't know,
+
+03:11.730 --> 03:13.590
+888 8 or 880.
+
+03:13.620 --> 03:23.640
+The port and the and the IP is the loopback default Nic, which points to myself for development purposes.
+
+03:24.030 --> 03:24.270
+Right.
+
+03:24.270 --> 03:29.670
+So that's the tcp IP 127.0.0.1.
+
+03:29.670 --> 03:38.850
+That's the IP version four for IPv6 loopback it's bracket colon colon one.
+
+03:38.850 --> 03:41.190
+That's the loopback for IPv6.
+
+03:41.370 --> 03:44.100
+But that's basically the games we're playing here.
+
+03:45.410 --> 03:46.940
+You might say, I don't have to do anything.
+
+03:46.940 --> 03:48.950
+When I listen, I just call in Node.js.
+
+03:48.950 --> 03:51.230
+I could call, listen, and then I close the bracket.
+
+03:51.230 --> 03:52.640
+I don't know any of this stuff.
+
+03:53.060 --> 04:00.350
+Well, this is where we need to talk, you guys, when you listen, you can give the option to listen
+
+04:00.350 --> 04:04.550
+on all interfaces, which is absolutely horrible idea.
+
+04:05.550 --> 04:06.690
+Horrible.
+
+04:06.690 --> 04:09.900
+And I'm really mad that this is a default.
+
+04:10.670 --> 04:14.960
+Apparently we have to make it a default because it's too much.
+
+04:15.600 --> 04:16.950
+To look up an IP.
+
+04:16.950 --> 04:21.630
+An IP can changes and and to make it easy, let's listen on all interfaces.
+
+04:22.170 --> 04:29.850
+And you do that by doing 0.0.0.04 zeros or I think an IPv6.
+
+04:30.680 --> 04:31.550
+Bracket.
+
+04:31.550 --> 04:40.070
+Colon colon bracket that listens on I Ole IPv6 versus all IPv4 interfaces because you can have both
+
+04:40.070 --> 04:40.310
+right?
+
+04:42.590 --> 04:50.510
+Watch out for this because you're building a small app that does, I don't know opens a port and you're
+
+04:50.510 --> 04:54.800
+accidentally deployed it in production and you want it like literally to run it locally.
+
+04:54.800 --> 05:02.120
+You just and all of a sudden you you run it and it will just listen on all production and next, which
+
+05:02.120 --> 05:08.990
+happens to one of them happens to be a public IP address or a public or an IP address that is essentially
+
+05:08.990 --> 05:11.720
+mapped to some load balancer.
+
+05:12.140 --> 05:13.550
+It's public eventually.
+
+05:13.550 --> 05:13.940
+Right.
+
+05:13.940 --> 05:17.420
+So now you exposed your app to the public.
+
+05:17.420 --> 05:26.720
+That's how every single MongoDB instance and Elasticsearch data got breached, because people just listen
+
+05:26.720 --> 05:29.210
+to all interfaces and deploy it on the cloud.
+
+05:30.740 --> 05:39.440
+And and literally attackers will scan the whole web, scan all the IPv4, uh, you know, ranges looking
+
+05:39.440 --> 05:45.890
+for the Elasticsearch Mongo DB port and then connect and then brute force their way.
+
+05:46.640 --> 05:48.200
+So that's really dangerous.
+
+05:48.200 --> 05:54.050
+You really want to listen on a specific port that you're actually know, right.
+
+05:54.170 --> 05:55.370
+It's hard.
+
+05:55.370 --> 05:56.960
+It's difficult.
+
+05:57.170 --> 05:58.910
+It's Klum not Klum.
+
+05:58.910 --> 06:05.930
+It's it's a it it's it requires some more work, but it's secure.
+
+06:05.960 --> 06:15.110
+Now then we have listened on a port and IP Hussain, when you do that you call a system called code.
+
+06:15.110 --> 06:20.300
+Listen and you get back a beautiful file descriptor called socket.
+
+06:20.300 --> 06:27.890
+And this is I'm going to coin a name for it, call it listening socket file descriptor.
+
+06:28.190 --> 06:30.410
+Because a connection is also a socket.
+
+06:30.410 --> 06:32.990
+But that's kind of a different kind of a socket.
+
+06:32.990 --> 06:34.970
+It's the same data structure.
+
+06:35.210 --> 06:35.990
+Right.
+
+06:35.990 --> 06:41.420
+And the kernel kind of stores them in the same file, the same table data structure.
+
+06:41.420 --> 06:46.730
+But you can see that the socket has only listening socket.
+
+06:46.730 --> 06:49.580
+It doesn't have like a source IP or destination IP.
+
+06:49.580 --> 06:50.690
+It doesn't have any of that.
+
+06:50.690 --> 06:55.340
+But a connection actually is is a is an.
+
+06:56.150 --> 06:58.250
+Is an entity that has two sides.
+
+06:58.250 --> 07:01.820
+It has source, a client and a server.
+
+07:02.270 --> 07:07.040
+So a connection is different than a socket, but I'm going to call it a connection socket for now.
+
+07:07.040 --> 07:07.700
+We have a socket.
+
+07:07.700 --> 07:08.180
+Beautiful.
+
+07:08.180 --> 07:08.870
+What do we get.
+
+07:08.870 --> 07:10.310
+We get a file descriptor.
+
+07:10.310 --> 07:11.240
+Where does it live.
+
+07:11.240 --> 07:14.030
+It lives in the process ID where PCB.
+
+07:14.060 --> 07:17.750
+We know all these terms now guys we can talk safely with them.
+
+07:18.230 --> 07:19.400
+So socket is a file.
+
+07:19.400 --> 07:20.840
+What happens if I fork.
+
+07:21.410 --> 07:22.040
+Guess what.
+
+07:22.040 --> 07:27.620
+If you fork uh the the the files are shared.
+
+07:27.620 --> 07:27.980
+Right.
+
+07:27.980 --> 07:34.970
+Because you get a copy of everything that the process had at that point, including file descriptors.
+
+07:34.970 --> 07:36.050
+So watch out.
+
+07:36.050 --> 07:39.470
+Maybe this is, this is by design and this is good.
+
+07:40.150 --> 07:42.430
+So for careful what you forked.
+
+07:42.430 --> 07:43.930
+You fork, you get everything.
+
+07:43.930 --> 07:45.790
+You get a copy, complete copy.
+
+07:45.790 --> 07:51.310
+Now copy on write can kick in, of course, and only gets you unique stuff.
+
+07:51.310 --> 07:58.750
+But essentially you have a completely new version of that.
+
+07:59.020 --> 08:04.300
+So if I listened on a process, I have process a I listened.
+
+08:04.990 --> 08:08.320
+I got a file descriptor that is the socket, the listening socket.
+
+08:08.320 --> 08:09.610
+It's absolutely useless.
+
+08:09.610 --> 08:12.100
+Just that second listening socket by itself.
+
+08:12.100 --> 08:16.330
+We need to do something to it to get actual connections.
+
+08:16.330 --> 08:18.880
+But then what happened?
+
+08:19.780 --> 08:20.890
+You fork.
+
+08:21.070 --> 08:29.050
+You get a brand new process, so you get a brand new file descriptor that technically point to the same
+
+08:29.050 --> 08:29.530
+socket.
+
+08:29.530 --> 08:32.560
+So you have one file descriptor, one file descriptor.
+
+08:32.590 --> 08:40.030
+They are two different file descriptors, but they point to the same essentially same socket.
+
+08:40.120 --> 08:43.540
+So you can accept connections here and accept connections here.
+
+08:43.540 --> 08:47.170
+And that's how essentially uh how socket.
+
+08:47.870 --> 08:54.200
+How you can scale acceptance of a process, which is our next topic.
+
+08:54.200 --> 08:58.340
+So we talked about let's let's go back to our single process.
+
+08:58.340 --> 09:07.790
+We have a single socket in my process for every listening socket that we create you guys we get uh something
+
+09:07.790 --> 09:09.620
+called two things.
+
+09:09.620 --> 09:10.730
+You get two queues.
+
+09:11.990 --> 09:17.450
+Uh, don't get hung up on the word queue because they are not actually implemented as a queue, because
+
+09:17.450 --> 09:23.690
+a queue is a very it's not very efficient in this particular case, actually, one of my students called
+
+09:23.690 --> 09:24.020
+that out.
+
+09:24.020 --> 09:28.640
+So I was saying like the queue seems to be very inefficient, but I and I looked at the source code.
+
+09:28.640 --> 09:29.720
+It's not a queue at all.
+
+09:29.720 --> 09:31.610
+So it has a hash table it turns out.
+
+09:31.610 --> 09:37.610
+But we talk about it as a queue because it's easier to talk through it this way.
+
+09:37.610 --> 09:39.650
+So we get something called a syn.
+
+09:40.800 --> 09:48.930
+Q and this belongs to the socket S and we get another Q called the accept q.
+
+09:49.780 --> 09:50.320
+Why?
+
+09:50.320 --> 09:51.460
+What are those for?
+
+09:51.730 --> 09:57.910
+Well, if you if you're here, you probably know how to establish a TCP connection, right.
+
+09:57.910 --> 10:03.220
+We do a send and then the server sends back a syn ack.
+
+10:03.310 --> 10:05.980
+And then the client sends back an Ack.
+
+10:05.980 --> 10:07.990
+And that's called the three way handshake.
+
+10:07.990 --> 10:13.420
+And using that we get a beautiful, uh, connection.
+
+10:13.420 --> 10:13.840
+Okay.
+
+10:13.960 --> 10:15.520
+But that's the handshake.
+
+10:15.520 --> 10:21.280
+To handle the handshake, we we need this sense, which is the synchronization.
+
+10:21.280 --> 10:28.330
+We use them to, to synchronize the sequence numbers that we use to label every segment essentially.
+
+10:29.320 --> 10:31.240
+So that's the first thing syn queue.
+
+10:31.330 --> 10:34.750
+So if you have a lot of listening you get a lot of syn queues.
+
+10:34.750 --> 10:37.300
+Essentially you also get an accept queue.
+
+10:37.990 --> 10:43.780
+This stores completed connections because if I did if I am a client I want to connect to you.
+
+10:43.780 --> 10:46.330
+I first send you a Syn by just sending you a syn.
+
+10:46.330 --> 10:47.740
+I don't have a connection yet.
+
+10:48.600 --> 10:51.390
+We take your sin and put it in the sink.
+
+10:51.420 --> 10:53.100
+We don't have a full fledged connection.
+
+10:53.100 --> 10:59.760
+We only have full fledged connection if we successfully completed the three way handshake, right?
+
+11:01.270 --> 11:11.140
+So then you can see that, as I'm putting sense here from multiple clients, right from one client in
+
+11:11.140 --> 11:18.160
+India, one client in Germany, one client coming from an IP address from Lebanon, one from Bahrain,
+
+11:18.160 --> 11:21.190
+one you see, you can see that this can fill up.
+
+11:21.190 --> 11:22.870
+And then we complete the connection.
+
+11:22.870 --> 11:24.940
+So we move this stuff to the accept queue.
+
+11:24.940 --> 11:28.810
+And we have fully fledged connection from Germany from Russia.
+
+11:28.810 --> 11:30.550
+We have these connections ready.
+
+11:30.550 --> 11:32.650
+But how many can I keep.
+
+11:33.160 --> 11:34.480
+In my ex.
+
+11:35.970 --> 11:37.380
+Before it fills up.
+
+11:37.980 --> 11:41.310
+There is a size to those, and this size is called the backlog.
+
+11:41.310 --> 11:44.760
+And you can essentially when you call listen you can specify the backlog.
+
+11:44.760 --> 11:46.590
+And this is actually exposed.
+
+11:48.140 --> 11:50.090
+All the way to the client.
+
+11:50.090 --> 11:54.080
+Even in NodeJS you can note and you can specify how much is your backlog.
+
+11:55.520 --> 11:57.500
+Really pretty cool if you think about it.
+
+11:58.030 --> 12:05.350
+You might need a large backlog if you have so many connections coming your way and you want to.
+
+12:05.350 --> 12:09.850
+Essentially you're not accepting connections fast enough.
+
+12:10.150 --> 12:16.780
+We'll talk about accepting in a minute now, because connections that lives here still is not with us.
+
+12:16.990 --> 12:17.980
+The back end.
+
+12:17.980 --> 12:19.870
+This is still all kernel.
+
+12:20.640 --> 12:21.000
+Rhyme.
+
+12:24.010 --> 12:28.030
+So now let's talk about actually creating connection.
+
+12:28.030 --> 12:30.460
+We don't we up to here we don't have a connection yet.
+
+12:30.460 --> 12:32.350
+We only have a listening socket.
+
+12:32.350 --> 12:34.270
+That is one file descriptor.
+
+12:34.420 --> 12:37.360
+Now let's talk about connections.
+
+12:37.930 --> 12:42.340
+What happened here is like completed connections are placed in the accept queue.
+
+12:42.370 --> 12:47.050
+We talked about that after you finish when you put a send put it here.
+
+12:47.050 --> 12:52.600
+And then the send entry comes here until we we send back the syn ack.
+
+12:52.600 --> 12:54.640
+And then the client will send back an ack.
+
+12:54.640 --> 12:57.490
+And then we match the ack with the syn here.
+
+12:57.490 --> 13:01.060
+And then we remove it from the syn q and we add it to the accept queue.
+
+13:01.060 --> 13:05.050
+And now we have a full fledged connection, but it still is not ready.
+
+13:05.530 --> 13:07.750
+You have to accept it.
+
+13:08.650 --> 13:09.490
+Who?
+
+13:09.520 --> 13:11.590
+Who is you?
+
+13:12.010 --> 13:13.630
+It's the back end application.
+
+13:14.170 --> 13:16.810
+You might say I say I never call this function in my life.
+
+13:17.360 --> 13:21.260
+Well, you don't, but Node.js does.
+
+13:21.260 --> 13:22.340
+But does.
+
+13:24.980 --> 13:29.360
+Django does all your framework does do.
+
+13:30.860 --> 13:40.100
+Behind the scenes, you must call accept which which creates the file descriptor for that connection.
+
+13:40.100 --> 13:46.970
+Yes, there is a dedicated Files connect descriptor file identifier for each connection.
+
+13:48.240 --> 13:54.720
+And when you do that, then we create additional two queues for the actual data that are going to be
+
+13:54.720 --> 13:55.320
+sent.
+
+13:56.040 --> 13:56.430
+Right.
+
+13:56.430 --> 13:59.670
+So when you do that you accept you're going to create a connection.
+
+13:59.670 --> 14:06.120
+That connection is going to be a file descriptor which lives on whomever or whoever, whom or who,
+
+14:06.150 --> 14:07.080
+whomever.
+
+14:07.080 --> 14:09.300
+The process that called accept.
+
+14:09.300 --> 14:15.000
+If I am process a, I called accept, then the file descriptor that comes back will live in process
+
+14:15.000 --> 14:15.240
+A.
+
+14:15.240 --> 14:21.870
+If I'm process B and happen to have access to the socket somehow and I called accept, then the file
+
+14:21.870 --> 14:29.250
+descriptor that gets created will live in my Process B's PCB process control block, and it's going
+
+14:29.250 --> 14:31.470
+to be a chain of file descriptors.
+
+14:31.470 --> 14:33.630
+Maybe I'll accept 100 connections.
+
+14:34.590 --> 14:40.680
+And with every one you get two cues send the cue or receive the cue will go will come to that in the
+
+14:40.680 --> 14:45.780
+next lecture, but each of them, the send cue will go for your outgoing data.
+
+14:45.930 --> 14:54.840
+So as a server, as a back end, if I send a response to my Rest API call that goes to the send queue.
+
+14:54.840 --> 14:59.430
+If my client sends a request, it goes to the receive queue.
+
+14:59.460 --> 15:00.360
+Does that make sense?
+
+15:01.110 --> 15:02.340
+And vice versa.
+
+15:02.370 --> 15:09.240
+The client also has a connection on its end as a client, and it will have a send queue and it has a
+
+15:09.240 --> 15:09.930
+receiver queue.
+
+15:09.960 --> 15:12.210
+The client does not have a socket.
+
+15:12.210 --> 15:14.130
+It does not have a listening socket.
+
+15:14.130 --> 15:17.040
+It has a just a connection.
+
+15:17.250 --> 15:17.730
+Right.
+
+15:17.880 --> 15:20.160
+So it has a send queue and receive queue.
+
+15:20.160 --> 15:23.190
+So if a client sends a request it goes to the send queue.
+
+15:23.190 --> 15:26.340
+And then eventually the kernel pushes it out to the neck.
+
+15:26.340 --> 15:33.840
+And then uh, it holds the receive queue where the response from the server will go into before we actually
+
+15:33.840 --> 15:38.820
+take the data and push it into the user space and do some stuff with it.
+
+15:41.410 --> 15:43.390
+Let's go through the simple connection.
+
+15:43.390 --> 15:44.110
+Establishment.
+
+15:44.110 --> 15:46.180
+Three way handshake.
+
+15:46.420 --> 15:47.410
+Three way handshake.
+
+15:47.410 --> 15:48.130
+Beautiful.
+
+15:48.700 --> 15:49.360
+We need it.
+
+15:49.390 --> 15:50.650
+We need the handshake.
+
+15:51.310 --> 15:54.340
+Otherwise, we cannot exchange information we need.
+
+15:54.490 --> 15:55.810
+We need to trust.
+
+15:55.810 --> 16:01.570
+We need to exchange certain metadata between the window size and all that stuff.
+
+16:01.570 --> 16:02.650
+We need the handshake.
+
+16:02.650 --> 16:05.830
+So we do a send snack an ack.
+
+16:06.250 --> 16:08.050
+And so what happens in the back end?
+
+16:08.080 --> 16:10.330
+This is where some stuff we just talked about right.
+
+16:10.450 --> 16:13.240
+A server listens on the on an address port.
+
+16:13.240 --> 16:15.790
+Client connects a kernel does a handshake.
+
+16:15.790 --> 16:17.320
+The kernel does the handshake.
+
+16:17.320 --> 16:21.490
+This is not you you you as a back end application, you only called.
+
+16:21.490 --> 16:24.550
+Listen, you do not do any of this stuff.
+
+16:24.550 --> 16:29.680
+The handshake, the connections, the the sink, the the accept queue.
+
+16:29.680 --> 16:36.730
+All of this is handled by the kernel, including the connection management, the three way handshake.
+
+16:36.730 --> 16:37.720
+But.
+
+16:38.630 --> 16:40.730
+The kernel completes the connection, puts an exception.
+
+16:40.760 --> 16:46.400
+It's all the onus on you as a back end process to call accept, to accept the connection.
+
+16:46.400 --> 16:53.090
+Otherwise it's going to sit there in the accept queue and it fills up the accept queue.
+
+16:54.010 --> 16:55.060
+And I do.
+
+16:55.060 --> 17:02.890
+And I actually in my uncover and discovering, uh, back in bottleneck course it's a little bit intermediate
+
+17:02.890 --> 17:03.940
+to advanced course.
+
+17:03.940 --> 17:06.280
+I show you, I fill up the accept queue.
+
+17:06.310 --> 17:07.420
+It's so cool.
+
+17:07.480 --> 17:08.410
+Check out that course.
+
+17:08.410 --> 17:10.390
+I fill up the accept queue and I try to connect.
+
+17:10.390 --> 17:12.040
+And it's just the connection.
+
+17:12.070 --> 17:13.000
+Uh, fails.
+
+17:13.180 --> 17:13.900
+Times out.
+
+17:13.900 --> 17:20.620
+It's so nice to force errors when you actually control errors because you completely understand what's
+
+17:20.620 --> 17:21.490
+going on.
+
+17:21.490 --> 17:25.990
+So I suggest you take that course to dive deep into troubleshooting back in application.
+
+17:25.990 --> 17:31.240
+I don't think this this venue is the right venue for that because we're talking about the fundamentals
+
+17:31.240 --> 17:32.590
+of operating systems here.
+
+17:32.590 --> 17:32.950
+Right.
+
+17:32.950 --> 17:34.390
+So let's go through this a little bit.
+
+17:34.390 --> 17:40.150
+So the kernel creates a socket gets two queues send and accept client sends send.
+
+17:40.510 --> 17:40.900
+Right.
+
+17:40.900 --> 17:48.100
+So the client library understand how to speak the TCP protocol and sends a send.
+
+17:48.310 --> 17:51.820
+And it's probably done by the kernel as well.
+
+17:51.820 --> 17:52.150
+Right.
+
+17:52.150 --> 17:59.350
+Because all the library does is like hey create a connection and the kernel does send and syn-ack and
+
+17:59.350 --> 18:07.000
+the kernel adds the syn received by the client to the queue and replies back with a syn ack.
+
+18:07.610 --> 18:11.120
+And then waits in this waiting.
+
+18:11.150 --> 18:14.390
+That wait is dangerous.
+
+18:15.010 --> 18:16.960
+People exploited that.
+
+18:16.960 --> 18:17.560
+Wait.
+
+18:18.450 --> 18:19.470
+You know where.
+
+18:19.470 --> 18:20.610
+I added us in?
+
+18:21.210 --> 18:23.700
+And I replied with the cynic and I'm waiting.
+
+18:23.700 --> 18:25.380
+We're waiting for one more thing.
+
+18:25.380 --> 18:27.150
+An act, a final act.
+
+18:27.180 --> 18:30.750
+This guy, we're waiting for that final act to complete the connection.
+
+18:31.960 --> 18:33.490
+Malicious client.
+
+18:33.820 --> 18:34.630
+That was years ago.
+
+18:34.630 --> 18:36.400
+Of course this problem was solved.
+
+18:37.090 --> 18:44.650
+Malicious clients, uh, will send us n will will will receive a snack, but will never acknowledge.
+
+18:45.610 --> 18:47.020
+What does that mean?
+
+18:47.020 --> 18:55.750
+You have a sin occupied on the sin queue on the back end listener socket.
+
+18:55.750 --> 18:56.770
+Send queue.
+
+18:57.760 --> 18:58.990
+Now you do it again.
+
+18:58.990 --> 19:01.000
+As an attacker, I do another sin.
+
+19:02.050 --> 19:03.250
+I get a snack?
+
+19:03.640 --> 19:07.960
+We just filled up another thin slot in the sink.
+
+19:10.450 --> 19:13.990
+You, then just say, hey, never mind, I'm not going to reply with that.
+
+19:14.410 --> 19:17.230
+So two you do it again and again and again.
+
+19:17.230 --> 19:17.830
+Again.
+
+19:18.040 --> 19:19.630
+You fill up the sink.
+
+19:19.660 --> 19:23.800
+You just did a DDoS attack, a DDoS, not really a distributed.
+
+19:23.800 --> 19:25.990
+A single user could could take down the whole.
+
+19:27.080 --> 19:28.010
+Uh, client.
+
+19:28.010 --> 19:29.990
+This will solve with sync cookies.
+
+19:30.940 --> 19:37.420
+Right, which has been, uh, now this has the the problem has been solved long, long time ago with
+
+19:37.420 --> 19:38.710
+timeouts and stuff like that.
+
+19:38.710 --> 19:46.720
+Hey, if you don't send me a the scene within 520 milliseconds, you're done or something.
+
+19:46.720 --> 19:50.110
+520 is too small, like 100 milliseconds.
+
+19:50.110 --> 19:52.030
+And you can configure that timeout as well.
+
+19:52.990 --> 19:54.100
+So congratulations.
+
+19:54.100 --> 20:00.130
+The connection kernel removes the Syn from the syn queue, so frees up an entry in the scene queue and
+
+20:00.130 --> 20:06.040
+the kernel adds a full connection to the accept queue and the back end accept connection removes it
+
+20:06.040 --> 20:07.210
+from the accept queue.
+
+20:07.210 --> 20:10.240
+If you accept the connection, it's removed from the accept queue.
+
+20:10.240 --> 20:18.550
+If you do not accept the connection for any reason, let's say your application froze or you're just
+
+20:18.550 --> 20:25.180
+too darn slow as a back end application, you're doing all sorts of things and you're not calling accept
+
+20:25.180 --> 20:26.050
+fast enough.
+
+20:27.150 --> 20:28.950
+Because you have a lot of connections.
+
+20:29.520 --> 20:32.190
+You're doing all this work as a single process.
+
+20:32.190 --> 20:33.810
+You can only do so much.
+
+20:35.830 --> 20:39.070
+If you don't accept it, then it's going to rot.
+
+20:39.070 --> 20:40.240
+And the more.
+
+20:41.610 --> 20:47.730
+Connections that are left in the accept queue that will fail.
+
+20:47.880 --> 20:56.100
+Completed connections from being moved to the queue because the the client, the kernel cannot can no
+
+20:56.100 --> 21:02.730
+longer accept more sins because the accept queue is full and you don't really want to get into that
+
+21:02.730 --> 21:03.450
+case.
+
+21:04.020 --> 21:09.990
+You want to accept as many connections as possible, but you will also need to know if those connections
+
+21:09.990 --> 21:11.280
+are malicious or not.
+
+21:11.280 --> 21:18.570
+That's where Cloudflare and all these guys just, you know, spent tons of money and research on on
+
+21:18.570 --> 21:22.890
+understanding the behavior of attackers versus legitimate users.
+
+21:23.550 --> 21:26.160
+It's a very interesting world indeed.
+
+21:26.640 --> 21:28.110
+And of course, we talked about this.
+
+21:28.230 --> 21:30.450
+You get a beautiful file descriptor.
+
+21:31.530 --> 21:33.510
+For every connection you accept.
+
+21:34.140 --> 21:36.420
+Let's go through some animations.
+
+21:36.510 --> 21:41.130
+So here's my client, here's my process ID on the back end that is running.
+
+21:41.790 --> 21:47.100
+And of course, these two lives in the kernel, which nothing but a mapped area in the process to the
+
+21:47.100 --> 21:50.700
+kernel step, uh, uh, to the kernel stage.
+
+21:50.700 --> 21:51.120
+Right.
+
+21:51.120 --> 21:54.030
+So accessing those queues, right.
+
+21:54.030 --> 21:56.940
+Of course, require kernel mode, right, to be accessed.
+
+21:56.940 --> 21:59.280
+You cannot access them directly from the process.
+
+21:59.280 --> 22:00.720
+These are forbidden.
+
+22:01.080 --> 22:01.590
+Right.
+
+22:02.040 --> 22:06.450
+Uh, again I o you ring kind of brain breaks this rule.
+
+22:06.450 --> 22:09.600
+But for normal operation, you cannot access them.
+
+22:09.600 --> 22:10.500
+They are protected.
+
+22:11.190 --> 22:16.290
+So the sin comes in here and it sits in the send queue, right.
+
+22:16.290 --> 22:22.590
+So the sin will have a from IP address, a from port, a destination IP address and a destination port.
+
+22:22.590 --> 22:26.640
+And that's the four tuples that uniquely identify this guy.
+
+22:26.640 --> 22:27.900
+And you put it right here.
+
+22:28.650 --> 22:29.430
+Beautiful.
+
+22:29.430 --> 22:30.990
+Now we have a sin entry.
+
+22:30.990 --> 22:38.700
+You immediately as a kernel reply back via snack where the from and two from IP and from port is the
+
+22:38.700 --> 22:42.690
+whatever listening socket IP we listen to.
+
+22:42.960 --> 22:43.710
+Right.
+
+22:43.710 --> 22:50.250
+And actually whatever the client decided to connect to let's say I'm listening on all IPS, right.
+
+22:50.490 --> 22:53.970
+So the sin the client cannot connect to all IPS.
+
+22:53.970 --> 22:55.620
+It has to specify one.
+
+22:55.620 --> 22:59.400
+And by knowing that one that becomes the source IP.
+
+22:59.400 --> 23:09.390
+In this particular case, if and only if there is a matching corresponding socket, because I drew this
+
+23:09.390 --> 23:10.020
+as a line.
+
+23:10.020 --> 23:12.510
+But there's so much stuff going on going on here.
+
+23:12.510 --> 23:13.890
+What is what is going on?
+
+23:13.890 --> 23:20.130
+If I am doing a sin and I'm the my destination IP is 1.1.1.1.
+
+23:20.640 --> 23:20.850
+All right.
+
+23:20.850 --> 23:23.160
+That's Cloudflare's and the.
+
+23:23.780 --> 23:24.950
+Port is 80.
+
+23:26.030 --> 23:32.840
+Then the colonel first looks up the destination IP insert in table we're going to talk about.
+
+23:33.020 --> 23:34.580
+And that table says, all right.
+
+23:35.270 --> 23:47.210
+Do I have a matching, uh, Colonel entry that says I'm listening on this particular socket on this
+
+23:47.210 --> 23:47.720
+IP?
+
+23:47.750 --> 23:49.040
+Yes or no?
+
+23:49.040 --> 23:51.440
+If yes, let's do it.
+
+23:51.770 --> 23:52.520
+I accept you.
+
+23:52.520 --> 23:55.940
+If no, we get an error that no listening socket or we get an error.
+
+23:56.670 --> 23:57.600
+All right.
+
+23:57.600 --> 24:00.450
+So you see there is a matching that needs to happen.
+
+24:00.690 --> 24:02.820
+We need to look up.
+
+24:03.570 --> 24:05.490
+Imagine yourself actually implementing this.
+
+24:05.490 --> 24:06.420
+How would you do it?
+
+24:06.420 --> 24:08.670
+There's like billions of ways to do it.
+
+24:09.120 --> 24:12.330
+A little exaggerating, but the kernel does it a certain way.
+
+24:12.330 --> 24:14.520
+This lookup should be.
+
+24:15.310 --> 24:17.650
+Massively fast.
+
+24:18.240 --> 24:21.960
+But possibly hopefully in the, in the, in the cache and the CPU.
+
+24:21.960 --> 24:28.950
+All of these structures really need to be cached because you don't want to go look up that massive table
+
+24:28.950 --> 24:32.790
+with all the listeners, you know, you want to quickly look it up.
+
+24:32.850 --> 24:38.340
+And from this you would know based on that entry you would know which process.
+
+24:39.130 --> 24:40.060
+It belongs to.
+
+24:41.050 --> 24:42.430
+Absolutely beautiful.
+
+24:43.770 --> 24:45.690
+So now we return the snack.
+
+24:45.690 --> 24:48.570
+Let's say we have a behaving client that replies back with an ack!
+
+24:48.600 --> 24:50.490
+Now you have a full fledged connection.
+
+24:50.490 --> 24:53.940
+The colonel removes it and adds it to the accept queue.
+
+24:53.970 --> 24:55.770
+Now we have a free connection here.
+
+24:55.800 --> 24:57.240
+Now then.
+
+24:58.560 --> 25:00.510
+The process calls, except.
+
+25:02.120 --> 25:09.530
+Which will copy that connection, creates the content, creates a file descriptor, and copy it to the
+
+25:09.740 --> 25:12.950
+to the user's file space and it will create an entry.
+
+25:13.070 --> 25:13.400
+Yeah.
+
+25:14.060 --> 25:14.480
+That's it.
+
+25:14.480 --> 25:14.690
+All right.
+
+25:14.720 --> 25:17.900
+Now we have an actual connection.
+
+25:18.990 --> 25:25.920
+And it will create the two receive queue, the receive Q and the send queue for that particular connection.
+
+25:27.020 --> 25:30.140
+Right now we have a file descriptor right here.
+
+25:32.630 --> 25:34.670
+So problems with accepting connections.
+
+25:34.670 --> 25:35.930
+Let's talk about some problems.
+
+25:35.930 --> 25:41.990
+Backend doesn't accept fast enough clients who don't ask and we have a small backlog.
+
+25:41.990 --> 25:47.120
+If you have a small backlog, you might you might have a problem with them, you know.
+
+25:48.270 --> 25:49.080
+You call.
+
+25:49.080 --> 25:51.000
+Except, by the way, if you call, except.
+
+25:51.000 --> 25:52.200
+And this is empty.
+
+25:52.380 --> 25:53.520
+You're blocked.
+
+25:54.510 --> 25:54.840
+Right.
+
+25:55.050 --> 26:01.920
+And that's why, except is also a candidate for asynchronous IO, which we're going to talk about in
+
+26:01.920 --> 26:02.970
+another lecture.
+
+26:02.970 --> 26:04.890
+Beautiful stuff you guys.
+
+26:06.450 --> 26:08.700
+Let's talk about socket sharding a little bit.
+
+26:09.720 --> 26:10.050
+Um.
+
+26:12.970 --> 26:13.900
+There are.
+
+26:15.120 --> 26:18.000
+Two different approaches to this, you know.
+
+26:18.740 --> 26:19.760
+I'll talk about.
+
+26:19.760 --> 26:25.910
+This is the second one, which is literally getting a different.
+
+26:26.500 --> 26:31.030
+Distinct socket on the same port.
+
+26:31.030 --> 26:39.520
+So we have two processes that are not talking to each other yet listening on the same socket.
+
+26:39.520 --> 26:43.720
+So you have two sockets pointing to the same.
+
+26:44.760 --> 26:45.240
+Um.
+
+26:46.310 --> 26:48.620
+IP port pair.
+
+26:49.480 --> 26:56.980
+Listener versus the other approach, where you have a listening socket and you fork the process to get
+
+26:56.980 --> 27:04.240
+a copy of the file descriptor, which happened to point to the same logical, physical, sorry, socket.
+
+27:04.960 --> 27:07.000
+So if those two guys.
+
+27:07.630 --> 27:14.230
+We're sharing one pair of sin and accept queue here.
+
+27:14.470 --> 27:21.940
+This is an approach where we're getting two distinct socket pointing to the same entry.
+
+27:22.510 --> 27:29.200
+And you do this using the socket option reuse port because.
+
+27:30.460 --> 27:35.110
+Normally, if you listen on the same port and IP, you get an error.
+
+27:35.110 --> 27:37.240
+Remember like socket already listening.
+
+27:37.240 --> 27:38.590
+That's a common error.
+
+27:38.920 --> 27:48.640
+But with this you can actually get to another socket and you can do it any number of times.
+
+27:49.060 --> 27:53.020
+Now this poses and we'll talk about this now in a minute.
+
+27:54.170 --> 27:57.350
+Nginx does it, envoy does it, HAProxy does it.
+
+27:57.350 --> 28:03.410
+And essentially what you do is you have the listener and the acceptors and the readers.
+
+28:03.410 --> 28:03.710
+Right.
+
+28:03.950 --> 28:08.360
+The acceptors, all of these are just different threads or different processes.
+
+28:08.360 --> 28:15.950
+And this is what's called the socket sharding where this process will have a socket.
+
+28:15.950 --> 28:23.480
+And this process will also have a socket and both represent the same IP port.
+
+28:27.960 --> 28:33.870
+Now this poses a problem because if a client came in with a sin.
+
+28:35.460 --> 28:36.300
+Right.
+
+28:38.490 --> 28:39.480
+And.
+
+28:40.120 --> 28:42.520
+What do we do in this particular case?
+
+28:42.580 --> 28:45.220
+Which socket gets the syn.
+
+28:45.220 --> 28:52.300
+And now I I'm imagining and I don't know the detail about this and I imagining either you can have two
+
+28:52.330 --> 29:00.070
+sends or one send queue for both sockets but different accept queues for sure.
+
+29:00.760 --> 29:01.360
+Right.
+
+29:01.360 --> 29:05.860
+So in this particular case process one will have an accept queue process, two will have another accept
+
+29:05.860 --> 29:07.630
+queue for the same port.
+
+29:07.630 --> 29:12.430
+If I get a Syn on this port, complete the connection ready.
+
+29:12.430 --> 29:15.730
+The kernel will do a load balancing.
+
+29:15.730 --> 29:19.120
+It will throw the accept queue right.
+
+29:19.540 --> 29:24.220
+It will throw the first connection on the first accept queue, the second one on the second, the third
+
+29:24.220 --> 29:25.810
+one on the third, and so on.
+
+29:25.810 --> 29:26.290
+Right.
+
+29:26.290 --> 29:28.630
+And that's how we that's how they do it.
+
+29:29.320 --> 29:36.940
+So it will distribute the connections on different accept queues.
+
+29:36.940 --> 29:40.510
+And if it happens to have on this accept queues.
+
+29:40.510 --> 29:46.210
+This process calls accept on its own socket which will point to their own accept queue.
+
+29:46.210 --> 29:56.170
+And in this particular case we call accept on my socket which happens to use, but both are on the same
+
+29:56.170 --> 29:58.900
+Nic on the same IP and port.
+
+29:58.990 --> 30:05.710
+This is a common configuration that people do in order to scale acceptance, right?
+
+30:05.710 --> 30:09.580
+And this is referred to as socket sharding or sharding the socket.
+
+30:09.670 --> 30:14.170
+But the Linux kernel in this particular case does the load balancing.
+
+30:14.170 --> 30:19.840
+So there is uh, when they first introduced this there was a lot of bugs with this.
+
+30:20.730 --> 30:29.640
+Because, uh, as connections close and open, we lost the balance of, uh.
+
+30:30.090 --> 30:31.200
+We have a connection.
+
+30:31.200 --> 30:31.980
+You're done.
+
+30:32.280 --> 30:36.090
+The connection is like, you have a nice file descriptor to go to.
+
+30:36.420 --> 30:39.660
+The problem with this is only when you accept connections.
+
+30:39.660 --> 30:46.110
+The load balancing becomes really interesting as as sockets get destroyed and recreated again.
+
+30:46.110 --> 30:46.410
+Right.
+
+30:47.010 --> 30:49.350
+So as I found this very interesting.
+
+30:49.350 --> 30:55.290
+So I thought I added another just dedicated slide for that summary.
+
+30:55.290 --> 30:59.190
+So the kernel manages the TCP IP part of networking.
+
+30:59.190 --> 31:03.090
+At least every socket represent a port, an IP right.
+
+31:03.090 --> 31:06.570
+You can with a specific socket options.
+
+31:06.570 --> 31:11.790
+When you listen you can say, hey, I want to.
+
+31:12.320 --> 31:16.760
+Listen on the same port and the same IP, despite someone else using them.
+
+31:16.820 --> 31:20.030
+But it's not straightforward.
+
+31:20.030 --> 31:28.760
+You have those two processes, have to agree on certain, you know, on certain cookie or certain key
+
+31:28.760 --> 31:31.430
+to allow them to listen on the same port.
+
+31:31.970 --> 31:34.850
+And this is basically determined by the first process.
+
+31:35.120 --> 31:38.570
+If you don't know that key then you can't listen.
+
+31:38.570 --> 31:39.860
+Because guess what?
+
+31:39.860 --> 31:50.120
+What stops me from running a process in a server that happened to be listening on port 80 and I do a
+
+31:50.150 --> 31:51.380
+socket reuse 80.
+
+31:52.640 --> 31:56.600
+I can hijack packets as a malicious process.
+
+31:56.600 --> 31:57.950
+That is a bad idea.
+
+31:57.950 --> 31:59.360
+That was one of the bugs.
+
+31:59.720 --> 32:00.650
+Early, early.
+
+32:00.650 --> 32:09.860
+So to to fix that you need to know what was the key that was used in the listening and was socket option
+
+32:09.860 --> 32:12.710
+reuse port actually allowed or not?
+
+32:12.710 --> 32:14.930
+Can you listen on the same port or not?
+
+32:15.170 --> 32:18.470
+So it's very, very interesting to learn about all of this stuff.
+
+32:18.470 --> 32:20.240
+So each connected client gets a connection.
+
+32:20.240 --> 32:20.990
+We talked about that.
+
+32:20.990 --> 32:30.410
+And kernel manages the dole those beautiful data structures you know and there is an associated cost
+
+32:30.410 --> 32:36.980
+to all this you guys you know, and it's not very clear from just the listening part because you don't
+
+32:36.980 --> 32:38.360
+really shove a lot of data.
+
+32:38.360 --> 32:46.730
+But for the connection acceptance I mean, not acceptance per se, but but just just receiving and actually
+
+32:46.730 --> 32:49.280
+dealing with packets and parsing those packets.
+
+32:49.280 --> 32:52.310
+There is so much stuff here that I'm not going to go through right.
+
+32:52.310 --> 32:54.260
+That's a course by itself.
+
+32:54.260 --> 32:56.270
+That's a book I know.
+
+32:56.940 --> 32:59.730
+Because you're talking about the actual packets.
+
+32:59.730 --> 33:00.270
+How do they.
+
+33:01.170 --> 33:09.360
+And there's like when you receive a packet from the from the receive data from the NEC, the kernel
+
+33:09.360 --> 33:11.010
+creates a data structure for it.
+
+33:11.010 --> 33:14.310
+It's called skip uh, socket buffers.
+
+33:14.640 --> 33:14.940
+Right.
+
+33:15.030 --> 33:17.310
+And then adds data to it.
+
+33:17.310 --> 33:22.470
+And then that there is metadata associated with it adds overhead.
+
+33:22.470 --> 33:29.910
+So the kernel does all sorts of trick to merge and to merge packets together and have list headers do
+
+33:29.910 --> 33:30.870
+so much stuff.
+
+33:30.870 --> 33:39.060
+So you need if you are like a beefy machine, you need to assign a core or two just for the networking
+
+33:39.060 --> 33:40.530
+stack, you know.
+
+33:40.530 --> 33:44.580
+So all right, I'm going to leave one core or two just for the kernel to do this.
+
+33:44.580 --> 33:49.380
+All this complex networking stuff, you know, especially if you have like a beefy CPU.
+
+33:49.800 --> 33:52.050
+All right, guys, so let's move to the next lecture.

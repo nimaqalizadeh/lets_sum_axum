@@ -1,0 +1,458 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Sockets and connections - Let&#x27;s sum Axum</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-d035bc48.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-51710b19.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Let&#x27;s sum Axum</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="sockets-and-connections"><a class="header" href="#sockets-and-connections">Sockets and connections</a></h1>
+<h2 id="a-socket-is-a-struct-and-also-a-file"><a class="header" href="#a-socket-is-a-struct-and-also-a-file">A socket is a struct, and also a file</a></h2>
+<p>In C, a socket is a <code>struct</code> in the kernel: it tracks one side of a network conversation — the local IP+port, the remote IP+port, the protocol (TCP/UDP), buffers for incoming and outgoing bytes, and connection state. On Linux you don’t touch that struct directly — the kernel hands your process a <strong>file descriptor</strong>, a small integer (like <code>3</code>, <code>4</code>, <code>5</code>) indexing into your process’s file table. That entry points to the kernel’s socket structure.</p>
+<p>A conversation between two machines is therefore <em>two</em> of these structs, one in each kernel, coordinating over the wire:</p>
+<pre><code class="language-text">      ── Laptop kernel ──                    ── Server kernel ──
+
+      struct sock                            struct sock
+      ┌──────────────────────┐               ┌──────────────────────┐
+      │ local  = laptop:51000│               │ local  = server:3000 │
+      │ remote = server:3000 │◄── wire ───►  │ remote = laptop:51000│
+      │ recv_queue [.......] │               │ recv_queue [.......] │
+      │ send_queue [.......] │               │ send_queue [.......] │
+      └──────────▲───────────┘               └───────────▲──────────┘
+                 │ read() / write()                      │
+              laptop app                             server app
+</code></pre>
+<p>Each kernel owns its own struct. Bytes your app <code>write()</code>s land in <em>your</em> kernel’s <code>send_queue</code>; they reach the peer’s <code>recv_queue</code> only after crossing NICs, switches, and routers. The two sides’ 4-tuples are mirrored — what one calls “local” the other calls “remote.” This is why <code>close()</code> is a half-close (you close <em>your</em> side), and why a crashed peer is invisible to you until TCP’s retransmit timers give up.</p>
+<p>Linux’s “everything is a file” maxim exists precisely so <code>read</code>, <code>write</code>, <code>close</code>, <code>epoll</code>, etc. all work uniformly on sockets, regular files, pipes, and terminals — the kernel dispatches each syscall to a different internal implementation based on what the fd points to. For a socket, <code>read()</code> pulls bytes out of the receive buffer; <code>write()</code> queues bytes into the send buffer for the NIC to transmit. On Windows sockets are objects rather than fds, but the conceptual model is the same.</p>
+<p>That uniformity is why a single <code>epoll</code> loop in Tokio can wait on thousands of sockets, pipes, and timers with one mechanism.</p>
+<p>When you <code>fork()</code> a process, the child gets a copy of the parent’s file descriptor table. Both processes end up with fds pointing to the <strong>same</strong> underlying socket. This is how pre-fork servers (like classic Apache or <code>gunicorn</code>) scale acceptance — multiple processes all holding fds to one listening socket.</p>
+<h2 id="whats-actually-inside-that-struct"><a class="header" href="#whats-actually-inside-that-struct">What’s actually inside that struct</a></h2>
+<p>We just said “a socket is a struct in the kernel.” What’s in it? The real C definitions in <code>&lt;linux/net.h&gt;</code> and <code>&lt;net/sock.h&gt;</code> run to hundreds of fields, but the shape is worth seeing before we go further — every field we refer to in later sections (“receive buffer,” “accept queue,” “congestion window”) is a specific slot on one of these structs. The code below is a Rust translation, which reads more cleanly than the C for this purpose. It isn’t code that compiles or runs; it’s the kernel’s layout, rewritten in a syntax that doesn’t require remembering C casting rules.</p>
+<p>A socket in Linux is really <strong>two structs stacked</strong>. Things true of every socket regardless of protocol (state, type, pointer to the file descriptor) live in one. Protocol-specific state (TCP sequence numbers, UNIX domain peer pointer) lives in another. That split is there because the syscall layer (<code>bind</code>, <code>listen</code>, <code>accept</code>) needs to work on <em>any</em> socket without knowing TCP from UDP from AF_UNIX.</p>
+<p><strong>The outer wrapper — <code>struct socket</code>.</strong> This is what the syscall boundary operates on:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Socket {
+    state: SocketState,           // Unconnected / Connecting / Connected / ...
+    kind:  SocketType,            // Stream / Dgram / Raw / ...
+    flags: SocketFlags,
+
+    file: Option&lt;Arc&lt;File&gt;&gt;,      // back-pointer to the VFS file for this fd
+    sk:   Arc&lt;Sock&gt;,              // the protocol-specific guts (see below)
+    ops:  &amp;'static dyn ProtoOps,  // vtable: bind / connect / sendmsg / ...
+    wq:   SocketWaitQueue,        // wakeups for blocking I/O and poll/epoll
+}
+<span class="boring">}</span></code></pre>
+<p>The interesting field is <code>ops</code>. In C it’s a <code>const struct proto_ops *</code> — a table of function pointers, one per operation. A trait object is exactly that, so in Rust we can write what’s actually happening:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>trait ProtoOps: Send + Sync {
+    fn bind    (&amp;self, sk: &amp;Sock, addr: &amp;SockAddr) -&gt; io::Result&lt;()&gt;;
+    fn connect (&amp;self, sk: &amp;Sock, addr: &amp;SockAddr) -&gt; io::Result&lt;()&gt;;
+    fn listen  (&amp;self, sk: &amp;Sock, backlog: i32)    -&gt; io::Result&lt;()&gt;;
+    fn accept  (&amp;self, sk: &amp;Sock)                  -&gt; io::Result&lt;Arc&lt;Sock&gt;&gt;;
+    fn sendmsg (&amp;self, sk: &amp;Sock, msg: &amp;MsgHdr)    -&gt; io::Result&lt;usize&gt;;
+    fn recvmsg (&amp;self, sk: &amp;Sock, msg: &amp;mut MsgHdr)-&gt; io::Result&lt;usize&gt;;
+}
+
+struct InetStreamOps;   impl ProtoOps for InetStreamOps { /* TCP */ }
+struct InetDgramOps;    impl ProtoOps for InetDgramOps  { /* UDP */ }
+struct UnixStreamOps;   impl ProtoOps for UnixStreamOps { /* AF_UNIX */ }
+<span class="boring">}</span></code></pre>
+<p>When userspace calls <code>bind(fd, …)</code>, the kernel walks <code>fd → struct file → struct socket → ops.bind</code>, and <em>that</em> dispatches to TCP or UDP or UNIX. The “everything is a file” maxim is exactly this indirection: one uniform API on top, per-protocol implementations dispatched through a vtable underneath.</p>
+<p><strong>The inner state — <code>struct sock</code>.</strong> This is the actual connection state — buffers, error flag, refcount. Almost everything interesting about a live socket lives here:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Sock {
+    family:        u16,                      // AF_INET / AF_INET6 / AF_UNIX
+    state:         AtomicU8,                 // TCP state machine, etc.
+    refcount:      AtomicUsize,              // sock_hold / sock_put
+
+    receive_queue: Mutex&lt;VecDeque&lt;SkBuff&gt;&gt;,  // "receive buffer" from section 2
+    write_queue:   Mutex&lt;VecDeque&lt;SkBuff&gt;&gt;,  // "send buffer" from section 2
+    rcvbuf:        usize,                    // SO_RCVBUF — max receive buffer
+    sndbuf:        usize,                    // SO_SNDBUF — max send buffer
+
+    error:         AtomicI32,                // sk_err — last async error
+    proto:         &amp;'static dyn Protocol,    // tcp_prot / udp_prot / unix_proto
+}
+<span class="boring">}</span></code></pre>
+<p><code>SkBuff</code> (in C, <code>struct sk_buff</code>) is the kernel’s packet container — one chunk of bytes plus metadata like sequence number and arrival time. A connection’s receive buffer is literally a queue of these. When section 2 says <code>read()</code> copies bytes out of the receive buffer, it’s draining this <code>VecDeque&lt;SkBuff&gt;</code>.</p>
+<p><strong>The family-specific subtypes.</strong> Each protocol family layers on top of <code>struct sock</code> by making it the first field. In C that’s “inheritance by pointer cast” — cast <code>struct tcp_sock*</code> to <code>struct sock*</code> and it works because the first field has the same layout. Rust spells that explicitly with a named field:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct InetSock {
+    base:  Sock,              // generic Sock embedded as first field
+    saddr: Ipv4Addr,          // source IP    (filled in after bind)
+    daddr: Ipv4Addr,          // dest IP      (filled in after connect/accept)
+    sport: u16,               // source port
+    dport: u16,               // dest port → these four form the 4-tuple
+}
+
+struct TcpSock {
+    inet:     InetSock,       // inherits InetSock, which inherits Sock
+
+    snd_nxt:  u32,            // next sequence number to send
+    snd_una:  u32,            // oldest unacked sequence number
+    rcv_nxt:  u32,            // next sequence number expected from peer
+    snd_cwnd: u32,            // congestion window (from section 2)
+    rtt_us:   u32,            // smoothed round-trip-time estimate
+    // ... dozens more fields: retransmit timers, SACK state, etc.
+}
+
+struct UnixSock {
+    base:  Sock,
+    addr:  Option&lt;PathBuf&gt;,         // sun_path — the filesystem path
+    peer:  Option&lt;Weak&lt;UnixSock&gt;&gt;,  // the socket on the other end
+}
+<span class="boring">}</span></code></pre>
+<p>Visually, a TCP socket is this nested tower, all living in one contiguous allocation in kernel memory:</p>
+<pre><code class="language-text">   ┌─ struct socket (outer wrapper, the syscall-layer handle) ───────┐
+   │  state | kind | flags                                            │
+   │  file  ───► VFS file (one per fd in your process's fd table)     │
+   │  ops   ───► dyn ProtoOps  ─►  tcp_stream_ops::{bind,connect,...} │
+   │  wq      wait queue for blocking I/O / poll / epoll              │
+   │  sk    ───►                                                      │
+   └──────────│──────────────────────────────────────────────────────┘
+              ▼
+   ┌─ TcpSock ──────────────────────────────────────────────────────┐
+   │ ┌─ InetSock ────────────────────────────────────────────────┐  │
+   │ │ ┌─ Sock ────────────────────────────────────────────────┐ │  │
+   │ │ │ family, state, refcount                                │ │  │
+   │ │ │ receive_queue, write_queue, rcvbuf, sndbuf             │ │  │
+   │ │ │ error, proto                                           │ │  │
+   │ │ └────────────────────────────────────────────────────────┘ │  │
+   │ │  saddr, daddr, sport, dport   ◄── the 4-tuple              │  │
+   │ └────────────────────────────────────────────────────────────┘  │
+   │  snd_nxt, snd_una, rcv_nxt, snd_cwnd, rtt_us, ...               │
+   └─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>Each outer layer embeds the inner one as its first field. That’s how C’s “inheritance by pointer cast” works — the bytes at the start of a <code>TcpSock</code> are bit-for-bit a <code>Sock</code>, so a <code>TcpSock*</code> can be treated as a <code>Sock*</code> with no conversion. Rust writes the same layout explicitly with a named <code>base</code> field and a method like <code>&amp;tcp.inet.base</code> to get the <code>Sock</code> view; same bytes, checked types.</p>
+<p>All the abstract vocabulary from the earlier sections now points to concrete fields:</p>
+<ul>
+<li>The <strong>4-tuple</strong> is <code>(inet.saddr, inet.sport, inet.daddr, inet.dport)</code>.</li>
+<li>The <strong>receive buffer</strong> is <code>base.receive_queue</code>.</li>
+<li>The <strong>congestion window</strong> is <code>tcp.snd_cwnd</code>.</li>
+<li>The <strong>flow-control window</strong> is tracked inside <code>TcpSock</code> too (we elided those fields for brevity; <code>rcv_wnd</code> / <code>snd_wnd</code>).</li>
+<li>The <strong>listener’s accept queue</strong> is another pair of queues on the listening socket’s <code>TcpSock</code> — one for half-open connections (the SYN queue), one for completed ones waiting for <code>accept()</code>.</li>
+</ul>
+<p><strong>Address structs that cross the syscall boundary.</strong> When you pass an address to <code>bind()</code> or get one from <code>accept()</code>, that’s a separate set of structs — not the kernel socket itself, just a tagged union describing “where.” C has one generic <code>struct sockaddr</code>, and each family casts its own (<code>sockaddr_un</code>, <code>sockaddr_in</code>, <code>sockaddr_in6</code>) through it. You read the first field (<code>sa_family</code>) to find out which one you have, then cast. Rust has sum types, so the whole pattern collapses:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum SockAddr {
+    Unix (PathBuf),                    // sockaddr_un
+    V4   (Ipv4Addr, u16),              // sockaddr_in  — addr + port
+    V6   (Ipv6Addr, u16, u32, u32),    // sockaddr_in6 — addr + port + flow + scope
+}
+<span class="boring">}</span></code></pre>
+<p>The discriminant travels with the value; no casts, no “don’t forget to check <code>sa_family</code> first” footgun. This is the one place Rust is strictly <em>better</em> than the C, not just clearer.</p>
+<p><strong>Three small translations worth naming.</strong> A few Rust idioms in the code above stand in for kernel patterns it’s easy to miss:</p>
+<ul>
+<li><code>Arc&lt;Sock&gt;</code> stands in for the kernel’s manual <code>sock_hold()</code> / <code>sock_put()</code> refcounting. Same idea — bump an atomic on reference, decrement on drop, free at zero — just checked by the compiler instead of by discipline.</li>
+<li><code>Mutex&lt;VecDeque&lt;…&gt;&gt;</code> stands in for the kernel’s spinlock-guarded queues. The real kernel uses <code>spin_lock_bh()</code> to synchronize between a softirq (packet arrival) and process context (your <code>read()</code> call); the shape is the same.</li>
+<li><code>SocketWaitQueue</code> is the kernel’s wait-queue primitive — a list of tasks blocked on this socket. When data arrives, the kernel walks the list and wakes them. <code>epoll</code> is implemented on top of these wait queues.</li>
+</ul>
+<p><strong>What your Rust code actually sees of all this.</strong> Nothing directly. <code>std::net::TcpStream</code> is essentially one field — a <code>RawFd</code>, which is just an <code>i32</code>. <code>tokio::net::TcpStream</code> adds an <code>epoll</code> registration and the <code>O_NONBLOCK</code> flag, but it’s still just an fd. The entire tower of <code>Socket</code> / <code>Sock</code> / <code>TcpSock</code> lives inside the kernel’s address space; your process holds a small integer index and calls syscalls to ask the kernel to read from, write to, or modify those structs.</p>
+<p>That split is the whole point of “everything is a file.” Section 2’s “the kernel appends bytes to the receive buffer” was prose before; now it’s <code>sock.receive_queue.push_back(skb)</code> on a specific struct in kernel memory, with your program holding nothing but the fd that identifies which struct. Section 4’s “epoll returns the ready fds” is a list of fds pointing at those structs. Tuning <code>SO_RCVBUF</code> is writing to the <code>rcvbuf</code> field. Every later section in this chapter is moving values between these fields; once you’ve seen the fields, the moves get easier to follow.</p>
+<h2 id="opening-a-server-socket-socket--bind--listen--accept"><a class="header" href="#opening-a-server-socket-socket--bind--listen--accept">Opening a server socket: socket → bind → listen → accept</a></h2>
+<p>There’s no <code>open("socket")</code>. A TCP server goes through four syscalls:</p>
+<ol>
+<li><strong><code>socket(AF_INET, SOCK_STREAM, 0)</code></strong> — the kernel allocates a socket structure and returns a new fd. No address, no connection yet.</li>
+<li><strong><code>bind(fd, addr)</code></strong> — associates the socket with a local IP and port (e.g. <code>0.0.0.0:3000</code>). The kernel now knows packets arriving at that port belong to this socket. If something else already owns the port, this fails with <code>EADDRINUSE</code>.</li>
+<li><strong><code>listen(fd, backlog)</code></strong> — flips the socket into “passive” mode. The kernel sets up a queue for incoming connection attempts and starts accepting SYN packets. <code>backlog</code> is how many half-open/pending connections to queue before dropping new ones.</li>
+<li><strong><code>accept(fd)</code></strong> — blocks (or, in async, registers interest with <code>epoll</code>) until a client completes the TCP three-way handshake. When one does, the kernel creates a <strong>new</strong> socket — a different fd — representing <em>that specific connection</em>, with the remote address filled in. The original listening fd keeps accepting more connections.</li>
+</ol>
+<p>So after <code>accept</code>, a server holds <strong>two kinds of fds</strong>: one listener fd that keeps accepting, and one per-connection fd for each active client.</p>
+<p><code>tokio::net::TcpListener::bind("0.0.0.0:3000")</code> is really <code>socket()</code> + <code>bind()</code> + <code>listen()</code>. Each value returned by <code>listener.accept().await</code> is a <code>TcpStream</code> wrapping a per-connection fd.</p>
+<h2 id="listening-pick-an-ip-pick-a-port"><a class="header" href="#listening-pick-an-ip-pick-a-port">Listening: pick an IP, pick a port</a></h2>
+<p><code>listen()</code> requires a specific <code>(IP, port)</code> pair. A machine can have many IPs: physical NICs, virtual NICs, loopback. You’re picking exactly one.</p>
+<p>The lazy default every framework ships with is <code>0.0.0.0</code> (or <code>[::]</code> for IPv6) — “listen on all interfaces.” It’s a footgun. Many real-world MongoDB and Elasticsearch breaches came from operators who deployed a dev-style <code>bind_ip: 0.0.0.0</code> to a cloud VM with a public IP. Attackers scan the whole IPv4 space for these ports and brute-force in. Prefer binding to a specific, known interface — a private address, or <code>127.0.0.1</code> for local-only. It’s slightly more work; it’s also the difference between “reachable from inside the VPC” and “reachable from Belarus.”</p>
+<h2 id="listening-socket-vs-connection-socket"><a class="header" href="#listening-socket-vs-connection-socket">Listening socket vs connection socket</a></h2>
+<p>After <code>listen()</code> you hold a <strong>listening socket</strong>: an fd with a local IP and port, no remote side, no buffers for data. It’s a rendezvous point.</p>
+<p>After <code>accept()</code> you hold a <strong>connection socket</strong>: a different fd, with a full 4-tuple <code>(local IP, local port, remote IP, remote port)</code>, plus dedicated send and receive buffers for that specific conversation. The listening socket stays; it keeps producing new connection sockets for each new client.</p>
+<p>The kernel stores both kinds in the same table, but a listening socket is partial (<code>LISTEN</code>, no remote) while a connection socket is fully specified (<code>ESTABLISHED</code>).</p>
+<pre><code class="language-text">   Listening socket (one per bind)        Connection sockets (one per accept)
+   ───────────────────────────────        ───────────────────────────────────
+   local  = 0.0.0.0 : 3000                local  = 10.0.0.5 : 3000
+   remote = (none)                        remote = 1.2.3.4  : 51000
+   state  = LISTEN                ┌────►  state  = ESTABLISHED
+   SYN queue    [..half-open..]   │       recv_queue / send_queue
+   accept queue [..completed..] ──┤
+                                  │       local  = 10.0.0.5 : 3000
+                                  │       remote = 9.8.7.6  : 62000
+                                  └────►  state  = ESTABLISHED
+                                          recv_queue / send_queue
+</code></pre>
+<p>One listening socket, no per-connection buffers, acts as a rendezvous point. Every successful <code>accept()</code> spawns a brand-new connection socket with its own buffers. The listener never carries data — only the connection sockets do.</p>
+<h2 id="how-the-kernel-routes-incoming-packets-the-4-tuple"><a class="header" href="#how-the-kernel-routes-incoming-packets-the-4-tuple">How the kernel routes incoming packets: the 4-tuple</a></h2>
+<p>Every TCP socket is uniquely identified by a <strong>4-tuple</strong>:</p>
+<pre><code>(local IP, local port, remote IP, remote port)
+</code></pre>
+<p>The kernel keeps a hash table of all active sockets keyed by this tuple. When a packet arrives on the NIC, the kernel reads the IP and TCP headers, builds the 4-tuple, looks it up in the table, and appends the payload bytes to the matching socket’s receive buffer — then wakes up whatever was waiting on that fd.</p>
+<pre><code class="language-text">   incoming packet on the NIC
+   ──────────────────────────
+       src = 1.2.3.4  : 51000
+       dst = 10.0.0.5 : 3000
+       TCP payload [..bytes..]
+              │
+              ▼   look up full 4-tuple in kernel's socket hash table
+   ┌─────────────────────────────────────────────────────────────────┐
+   │ (local=*:3000,               remote=*:*)           → listener   │
+   │ (local=10.0.0.5:3000,        remote=1.2.3.4:51000) → conn A  ◄──┤ match
+   │ (local=10.0.0.5:3000,        remote=9.8.7.6:62000) → conn B     │
+   └─────────────────────────────────────────────────────────────────┘
+              │
+              ▼
+       append payload to conn A's recv_queue
+       wake any task blocked on that fd
+</code></pre>
+<p>The listener’s tuple has wildcards (<code>*</code>) for the remote side — it matches any SYN whose full 4-tuple doesn’t already belong to an established connection. Established connections are full, specific tuples. This is also how one server accepts thousands of clients on a single local port without ambiguity: the remote <code>(ip, port)</code> pair is what differentiates them.</p>
+<p>Say your server is bound to <code>0.0.0.0:3000</code>. The listener socket is registered with a partial tuple <code>(local=*:3000, remote=*:*, state=LISTEN)</code> — it matches any incoming SYN to port 3000 whose full 4-tuple doesn’t already match an established socket.</p>
+<p>When client A (<code>1.2.3.4:51000</code>) finishes the handshake, the kernel creates a new socket:</p>
+<pre><code>(local=10.0.0.5:3000, remote=1.2.3.4:51000, state=ESTABLISHED)
+</code></pre>
+<p>Client B (<code>9.8.7.6:62000</code>) connects and gets:</p>
+<pre><code>(local=10.0.0.5:3000, remote=9.8.7.6:62000, state=ESTABLISHED)
+</code></pre>
+<p>Both share the same local port 3000 — that’s fine, because the kernel demultiplexes by the <strong>full 4-tuple</strong>, not just the local port. When Client A’s next TCP segment arrives, the kernel finds Client A’s socket by tuple match and puts the bytes in its recv buffer. Client B’s data goes to Client B’s socket. No mixing. This is also why a single client can open thousands of connections to your server without ambiguity: the client’s local port is ephemeral and different for each one.</p>
+<h2 id="one-socket-per-connection-not-per-request"><a class="header" href="#one-socket-per-connection-not-per-request">One socket per connection, not per request</a></h2>
+<p>A common confusion: you don’t get one socket per HTTP request. The unit is the <strong>connection</strong>.</p>
+<p>First, the vocabulary:</p>
+<ul>
+<li>A <strong>connection</strong> is the transport-layer pipe. For HTTP/1.x and HTTP/2, that’s a TCP connection: established by the 3-way handshake, identified by the 4-tuple <code>(local IP, local port, remote IP, remote port)</code>, torn down by FIN/RST. It’s just bidirectional bytes — TCP doesn’t know the word “request”.</li>
+<li>A <strong>request</strong> is an application-layer message defined by HTTP: method + path + headers + optional body. A response is the matching reply.</li>
+</ul>
+<p>The two are <strong>not 1:1</strong>, and the ratio has changed across HTTP versions:</p>
+<ul>
+<li><strong>HTTP/1.0 (no keep-alive)</strong>: 1 connection = 1 request + 1 response, then close. New TCP handshake (and TLS handshake) per request — expensive.</li>
+<li><strong>HTTP/1.1 with keep-alive</strong>: client sends a request → server responds → the socket stays open → client sends another request on the same socket. Many sequential requests on one connection; handshake paid once.</li>
+<li><strong>HTTP/2</strong>: many requests/responses are <strong>multiplexed concurrently</strong> over a single socket using stream IDs. Request #2 doesn’t wait for #1’s response.</li>
+<li><strong>HTTP/3</strong>: same multiplexing idea, but over QUIC on UDP.</li>
+</ul>
+<p>So a connection is a <em>container</em> that can carry 0, 1, or many requests over its lifetime. A browser loading a page with 50 assets from your server might use only 1–6 sockets total, not 50. Nothing at the kernel level distinguishes “request 1” from “request 2” on the same connection — they’re just a byte stream. The HTTP parser on top is what finds request boundaries (<code>\r\n\r\n</code> ends headers, <code>Content-Length</code> or chunked encoding delimits the body).</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="01_2_1.file_descriptors.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="01_2_3.listener_queues.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="01_2_1.file_descriptors.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="01_2_3.listener_queues.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

@@ -1,0 +1,493 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Asynchronous I/O - Let&#x27;s sum Axum</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-d035bc48.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-51710b19.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Let&#x27;s sum Axum</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="asynchronous-io"><a class="header" href="#asynchronous-io">Asynchronous I/O</a></h1>
+<p>Every syscall we’ve discussed — <code>accept</code>, <code>read</code>, <code>write</code> — can <strong>block</strong>. If there’s no connection in the accept queue, <code>accept()</code> blocks. If the receive buffer is empty, <code>read()</code> blocks. If the send buffer is full, <code>write()</code> blocks. “Blocks” means your thread parks in the kernel; the scheduler moves it off the CPU until something changes.</p>
+<p>One thread-per-connection is the simple model and it scales catastrophically: 10k connections = 10k parked threads = 10k × ~8MB stack = 80GB of address space, plus massive context-switch overhead. This is why every high-concurrency server is some flavor of asynchronous.</p>
+<p>There are two ideas for async I/O, and Linux offers one of each.</p>
+<h2 id="the-readiness-model"><a class="header" href="#the-readiness-model">The readiness model</a></h2>
+<p><em>“Tell me when this fd is ready; I’ll do the syscall myself.”</em></p>
+<p>The kernel watches a set of fds and notifies you when at least one becomes readable/writable. You then issue a non-blocking <code>read</code> or <code>accept</code>, which returns immediately because you know there’s something to read.</p>
+<ul>
+<li>
+<p><strong><code>select()</code></strong> — oldest. Pass it three bitmaps (read/write/exception fds), it blocks until any is ready or a timeout expires. Returns the <em>count</em> of ready fds, not <em>which</em> — you loop and call <code>FD_ISSET</code> for each. Also capped at <code>FD_SETSIZE</code> (typically 1024). Every call re-copies the full bitmap into kernel space. Fine for a dozen fds, a disaster at scale.</p>
+</li>
+<li>
+<p><strong><code>poll()</code></strong> — same idea, no hard size limit, still O(N) on each call. Incremental improvement only.</p>
+</li>
+<li>
+<p><strong><code>epoll</code></strong> — the modern Linux answer. Three syscalls:</p>
+<ul>
+<li><code>epoll_create()</code> — make an epoll instance (itself an fd).</li>
+<li><code>epoll_ctl(ADD/MOD/DEL)</code> — register interest in specific fds, once.</li>
+<li><code>epoll_wait()</code> — block until some registered fd is ready; the kernel returns a list of exactly which fds became ready.</li>
+</ul>
+<p>O(ready fds), not O(watched fds). Scales to hundreds of thousands of connections.</p>
+</li>
+</ul>
+<p><strong>Level-triggered vs edge-triggered</strong> is an epoll knob worth understanding:</p>
+<ul>
+<li><strong>Level-triggered</strong> (default) — as long as the fd <em>is</em> ready, <code>epoll_wait</code> keeps telling you. Simple and forgiving; you can read a little, come back next time for the rest.</li>
+<li><strong>Edge-triggered</strong> — you’re told once, on the transition from not-ready to ready. You must drain the fd to <code>EAGAIN</code> before returning to the loop, or you’ll miss wakeups. More efficient, more error-prone.</li>
+</ul>
+<p>Tokio uses edge-triggered with its own state machine to make it safe to use from Rust.</p>
+<h2 id="the-completion-model"><a class="header" href="#the-completion-model">The completion model</a></h2>
+<p><em>“Here’s the work; tell me when it’s done.”</em></p>
+<p>You submit an operation (read from this fd into this buffer). The kernel carries it out in the background and posts the completion somewhere you can read. You never block on the operation itself.</p>
+<ul>
+<li><strong>Windows IOCP</strong> (I/O Completion Ports) — the canonical implementation.</li>
+<li><strong><code>io_uring</code></strong> (Linux, 2019) — two shared-memory ring buffers between userspace and kernel: a <strong>submission queue</strong> and a <strong>completion queue</strong>. You write SQE (submission queue entries) into the ring, the kernel pulls them, does the work, writes CQE (completion queue entries) back. No syscall per I/O — the shared ring is the interface. Supports <em>every</em> I/O operation (files, sockets, accept, connect, fsync, etc.), fixing epoll’s file-incompatibility gap. Submit-poll-batch turns what would be thousands of syscalls into a few.</li>
+</ul>
+<p><code>io_uring</code> is the fastest thing on Linux, and it also has a rough security history — Google disabled it in ChromeOS and sandboxed it in Android in 2023 after paying out $1M in bounties for bugs in it. Shared-memory interfaces between userspace and kernel are hard to make watertight. It’s being hardened, and several Rust runtimes (<code>tokio-uring</code>, <code>monoio</code>, <code>glommio</code>) either use it or are built around it, but Tokio’s default remains epoll.</p>
+<h2 id="why-readiness-doesnt-work-for-files"><a class="header" href="#why-readiness-doesnt-work-for-files">Why readiness doesn’t work for files</a></h2>
+<p>Regular files are <em>always</em> “ready” — you can always issue a <code>read</code> — it’s just that the read might block for milliseconds on a disk seek. Epoll therefore refuses to register regular files: there’s no state transition to report. This is why you need a completion-style interface (io_uring, or a thread pool offload) for true async file I/O. Node’s <code>libuv</code> solves it by delegating file operations to a worker thread pool; Tokio does the same via <code>spawn_blocking</code> or <code>tokio::fs</code>.</p>
+<h2 id="libuv-one-api-many-backends"><a class="header" href="#libuv-one-api-many-backends">libuv: one API, many backends</a></h2>
+<p>Node’s abstraction layer, <code>libuv</code>, papers over the platform differences:</p>
+<ul>
+<li>Linux → <code>epoll</code></li>
+<li>macOS/BSD → <code>kqueue</code></li>
+<li>Windows → IOCP</li>
+<li>Files + DNS + crypto → thread pool</li>
+</ul>
+<p>Tokio plays the same role in the Rust ecosystem, built on <a href="https://github.com/tokio-rs/mio"><code>mio</code></a> underneath. When you write <code>socket.read(&amp;mut buf).await</code>, Tokio registers interest with <code>epoll</code> (on Linux), parks the task, and resumes it when the fd is ready — then issues the non-blocking <code>read</code> and returns the bytes to you. You never see any of this.</p>
+<p>That covers the kernel side — the syscalls that let one thread wait on many fds. Now the runtime side: how does a Rust program turn “fd 42 is ready” into “resume task #4711”? The answer is that tasks are ordinary heap structs driven by a tiny state-machine contract.</p>
+<p><strong>But how can you have a “pool of tasks” at all?</strong> The word “task” hides a lot — it sounds like a thread or a process, and it is neither. It helps to line up the three things side by side:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>Process</th><th>Thread</th><th>Task (Tokio)</th></tr>
+</thead>
+<tbody>
+<tr><td>Created by</td><td>kernel (<code>fork</code>)</td><td>kernel (<code>clone</code>)</td><td><strong>Tokio</strong> (<code>tokio::spawn</code>)</td></tr>
+<tr><td>Knows about it</td><td>OS scheduler</td><td>OS scheduler</td><td>only your program</td></tr>
+<tr><td>Cost to create</td><td>microseconds–milliseconds</td><td>microseconds</td><td>≈ a heap allocation</td></tr>
+<tr><td>How many feasible</td><td>dozens</td><td>hundreds</td><td><strong>millions</strong></td></tr>
+<tr><td>Memory footprint</td><td>own fd table + address space</td><td>own stack (~MB)</td><td>a small struct (~KB)</td></tr>
+</tbody>
+</table>
+</div>
+<p>A task is just a <strong>Rust struct on the heap, inside your one process</strong>. The kernel knows nothing about it. That’s why you can afford millions.</p>
+<p><strong>What’s inside that struct?</strong> The Rust compiler rewrites every <code>async fn</code> into a state machine. When you write:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>async fn handle(conn: TcpStream) {
+    let req = read_request(&amp;conn).await;    // pause point #1
+    let res = build_response(req).await;    // pause point #2
+    write_response(&amp;conn, res).await;       // pause point #3
+}
+<span class="boring">}</span></code></pre>
+<p>the compiler turns it (conceptually) into:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum HandleState {
+    Start            { conn: TcpStream },
+    WaitingForRead   { conn: TcpStream },
+    WaitingForBuild  { conn: TcpStream, req: Request },
+    WaitingForWrite  { conn: TcpStream, res: Response },
+    Done,
+}
+
+impl HandleState {
+    // "Try to make progress. If I'd block, return Pending and remember where I was."
+    fn poll(&amp;mut self) -&gt; Poll&lt;()&gt; { /* ... */ }
+}
+<span class="boring">}</span></code></pre>
+<p>Every <code>.await</code> becomes a state, and the local variables become fields of that state. “Pausing at <code>.await</code>” is just storing the struct somewhere and coming back to it later — there is no OS stack to save.</p>
+<h2 id="what-is-poll-and-what-does-poll-actually-do"><a class="header" href="#what-is-poll-and-what-does-poll-actually-do">What is <code>Poll</code>, and what does <code>poll</code> actually do?</a></h2>
+<p><code>Poll</code> is a tiny standard-library enum — just two variants:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum Poll&lt;T&gt; {
+    Ready(T),   // "I'm done! Here's the final value."
+    Pending,    // "I can't finish right now — I'm waiting for something."
+}
+<span class="boring">}</span></code></pre>
+<p><code>poll(&amp;mut self)</code> is the single verb the runtime uses to drive every task forward. It means: <strong>“Try to make progress. Don’t block. Either finish, or tell me you’re stuck and I’ll come back later.”</strong> The implementation is essentially a <code>match self { ... }</code> that tries to advance as far as it can, then returns one of the two variants:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn poll(&amp;mut self) -&gt; Poll&lt;()&gt; {
+    loop {
+        match self {
+            HandleState::Start { conn } =&gt; {
+                *self = HandleState::WaitingForRead { conn: take(conn) };
+                // loop around and try the new state immediately
+            }
+            HandleState::WaitingForRead { conn } =&gt; {
+                match try_read_request(conn) {
+                    Poll::Ready(req) =&gt; {
+                        *self = HandleState::WaitingForBuild { conn: take(conn), req };
+                    }
+                    Poll::Pending =&gt; return Poll::Pending,  // socket has no bytes yet
+                }
+            }
+            HandleState::WaitingForBuild { conn, req } =&gt; {
+                match try_build_response(req) {
+                    Poll::Ready(res) =&gt; *self = HandleState::WaitingForWrite { conn: take(conn), res },
+                    Poll::Pending    =&gt; return Poll::Pending,
+                }
+            }
+            HandleState::WaitingForWrite { conn, res } =&gt; {
+                match try_write_response(conn, res) {
+                    Poll::Ready(()) =&gt; *self = HandleState::Done,
+                    Poll::Pending   =&gt; return Poll::Pending,
+                }
+            }
+            HandleState::Done =&gt; return Poll::Ready(()),  // all finished
+        }
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>How does the task know its own status?</strong> The status <em>is</em> the task. The current enum variant <strong>is</strong> the state — there’s no separate status field. <code>match self</code> is literally the task asking “which variant am I right now?”, which tells it where to resume. To “change state,” we just overwrite <code>*self</code> with the next variant, carrying forward only the data the next step needs.</p>
+<p><strong>How does the task say “I’m done”?</strong> By returning <code>Poll::Ready(value)</code> from <code>poll</code>. That’s the entire signaling mechanism — the return value of <code>poll</code> carries two pieces of news at once:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Return value</th><th>What it tells the runtime</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Poll::Pending</code></td><td>“Not done. Don’t poll me again until my waker fires.”</td></tr>
+<tr><td><code>Poll::Ready(v)</code></td><td>“Done. Here’s the result. You can drop me from the heap.”</td></tr>
+</tbody>
+</table>
+</div>
+<p>When Tokio sees <code>Poll::Ready</code>, it drops the task struct (freeing the memory) and delivers the value to anyone who was awaiting its <code>JoinHandle</code>. No channels, no callbacks, no “finish” flag — the return type of one function carries the whole lifecycle.</p>
+<h2 id="parked-process-vs-parked-struct"><a class="header" href="#parked-process-vs-parked-struct">Parked process vs. parked struct</a></h2>
+<p>Both are “waiting for I/O,” but what’s actually parked in memory is wildly different:</p>
+<pre><code class="language-text">  PRE-FORK WORKER (one per connection)          TOKIO TASK (one per connection)
+  ══════════════════════════════════════        ══════════════════════════════════
+                                                           (inside ONE process,
+  ┌────────────────────────────────────┐                    shared by millions
+  │          OS PROCESS                │                    of tasks)
+  │  ┌──────────────────────────────┐  │
+  │  │ pid          = 4711          │  │                ┌────────────────────────┐
+  │  │ fd table     = [3, 7, ...]   │  │                │   Task (heap struct)   │
+  │  │ memory       = own heap      │  │                │ ────────────────────── │
+  │  │ stack        = ~2 MB reserved│  │                │ state: WaitingForRead  │
+  │  │ status       = BLOCKED       │  │                │ conn : TcpStream {...} │
+  │  │           (parked by kernel) │  │                │ waker: &lt;fn ptr&gt;        │
+  │  └──────────────────────────────┘  │                └────────────────────────┘
+  └────────────────────────────────────┘                Size: ~hundreds of bytes
+  Size: ~MBs per waiting connection                     Kernel knows: NOTHING
+  Kernel knows: everything, schedules it                Just sits on the heap until
+                                                        Tokio decides to poll it again
+
+  Cost to have 10,000 idle clients:              Cost to have 10,000 idle clients:
+     10,000 processes × several MB                  10,000 small structs
+     = gigabytes of RAM + kernel load               = a few megabytes, no kernel load
+</code></pre>
+<p><strong>Same outcome</strong> (paused until data arrives), <strong>very different cost</strong>. That’s the whole reason async runtimes exist.</p>
+<p><strong>The pool, concretely.</strong> Tokio’s runtime is ordinary Rust code running inside your one process. Very roughly:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct Runtime {
+    ready_queue:    Queue&lt;Arc&lt;Task&gt;&gt;,   // tasks that can make progress right now
+    worker_threads: Vec&lt;Thread&gt;,        // usually = number of CPU cores
+}
+
+// Each worker thread runs this loop, forever:
+fn worker_loop(rt: &amp;Runtime) {
+    loop {
+        let task = rt.ready_queue.pop();   // grab any ready task
+        match task.poll() {                 // run it until its next .await
+            Poll::Ready(_)  =&gt; { /* done — drop it */ }
+            Poll::Pending   =&gt; { /* task already registered interest via epoll */ }
+        }
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>A worker picks a task, calls <code>poll()</code>, the task runs until its next <code>.await</code>, returns <code>Pending</code>, and the worker grabs the <em>next</em> ready task. No blocking, no kernel context switch between tasks — just regular function calls inside one process.</p>
+<p><strong>How tasks get back into the ready queue.</strong> When <code>poll()</code> returns <code>Pending</code>, it has quietly told Tokio “wake me when fd 42 is readable.” Tokio translates that into an <code>epoll_ctl</code> on its internal epoll instance. A reactor thread calls <code>epoll_wait</code>; when the kernel reports “fd 42 is readable,” the reactor pushes that task back into <code>ready_queue</code>, and some worker picks it up.</p>
+<pre><code class="language-text">   ONE process
+   ┌────────────────────────────────────────────────────────────────┐
+   │  Thread pool (≈ N = CPU cores)                                 │
+   │    Thread 1    Thread 2    Thread 3    Thread 4                │
+   │       ▲           ▲           ▲           ▲                    │
+   │       │ each thread: pop a ready task, poll() it until .await, │
+   │       │ then pop the next one                                  │
+   │       │                                                        │
+   │  ready_queue:  [T17] [T83] [T402] ...   ← can run right now    │
+   │                                                                │
+   │  parked tasks (structs on the heap, waiting on I/O):           │
+   │  T1 (waiting on socket A)    T2 (waiting on a timer)           │
+   │  T3 (waiting on a DB reply)    ... thousands more ...          │
+   │                                                                │
+   │  epoll  ◄── reactor thread calls epoll_wait; when kernel says  │
+   │             "fd 42 ready," the task that cared about fd 42     │
+   │             gets moved back into ready_queue                   │
+   └────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>Side-by-side summary.</strong></p>
+<pre><code class="language-text">   Pre-fork                               Tokio (async)
+   ────────                               ─────────────
+   Many OS processes.                     One OS process.
+   Each blocked in accept()/read().       Small thread pool (≈ CPU cores).
+   A blocked worker = a whole             Thousands of task structs paused
+   process doing nothing.                 on the heap. Paused ≠ blocked —
+                                          paused costs ~0.
+   Scaling: limited by process            Scaling: limited by memory for
+   count (dozens).                        task structs (millions).
+</code></pre>
+<p>Same philosophy as pre-fork (“pay setup once, reuse workers”), but “worker” shrank from “OS process” to “Rust struct on the heap,” which is how you get the huge scaling jump.</p>
+<p><strong>Aside: “≈ CPU cores” — why that’s the right size for the thread pool.</strong> The phrase comes up a lot above, and it hides two different numbers worth separating:</p>
+<ul>
+<li><strong>How many threads <em>can</em> exist?</strong> A lot. On Linux, thousands per process is routine. The ceiling is memory (each thread has its own stack — 8 MB reserved by default, though only what’s used becomes real RAM) and a kernel limit like <code>/proc/sys/kernel/threads-max</code>. CPU count is <strong>irrelevant</strong> to this limit.</li>
+<li><strong>How many threads can <em>actually run at the same instant</em>?</strong> Exactly <strong>one per CPU core</strong> — or <strong>two per core</strong> with hyper-threading / SMT, where each physical core pretends to be 2 “logical CPUs” so it can keep its pipeline full when one thread stalls on memory. If you have more runnable threads than that, the OS <strong>time-slices</strong>: it runs each for a few milliseconds, then freezes it and swaps in another.</li>
+</ul>
+<pre><code class="language-text">   4-core CPU, no hyper-threading       4-core CPU with hyper-threading (SMT)
+   ──────────────────────────────       ─────────────────────────────────────
+   Core 0 ──► 1 thread running           Core 0 ──► 2 threads running
+   Core 1 ──► 1 thread running           Core 1 ──► 2 threads running
+   Core 2 ──► 1 thread running           Core 2 ──► 2 threads running
+   Core 3 ──► 1 thread running           Core 3 ──► 2 threads running
+   = 4 threads really executing          = 8 threads really executing
+   Everyone else waits in the runqueue   Everyone else waits in the runqueue
+</code></pre>
+<p>Check your own machine:</p>
+<pre><code class="language-bash">nproc              # number of logical CPUs (physical cores × SMT factor)
+lscpu              # full breakdown (sockets, cores, threads per core)
+</code></pre>
+<p>That’s why Tokio defaults to a worker pool sized to <code>num_cpus::get()</code> (i.e. <code>nproc</code>). Beyond that count, extra threads don’t run <em>more</em> work — they just pay the cost of being swapped in and out:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Workload</th><th>Good thread count</th></tr>
+</thead>
+<tbody>
+<tr><td>Pure CPU work (hashing, compression)</td><td><code>nproc</code> — any more is just context-switch overhead</td></tr>
+<tr><td>Mixed CPU + non-blocking I/O (Tokio’s target)</td><td><code>nproc</code> (Tokio’s default)</td></tr>
+<tr><td>Heavily blocking legacy I/O</td><td>Higher, but the real fix is async, not more threads</td></tr>
+</tbody>
+</table>
+</div>
+<p>And this is exactly why the task model wins: <strong>threads scale with cores, tasks scale with connections.</strong> You serve 10,000 connections with ~<code>nproc</code> threads and 10,000 lightweight task structs — not 10,000 threads.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="01_2_5.socket_patterns.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="01_2_7.axum_mapping.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="01_2_5.socket_patterns.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="01_2_7.axum_mapping.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

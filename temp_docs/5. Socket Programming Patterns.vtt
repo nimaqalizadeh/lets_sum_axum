@@ -1,0 +1,817 @@
+WEBVTT
+
+00:00.050 --> 00:06.440
+All right, guys, this is a a lecture that I took from my backend course, but I'm going to record
+
+00:06.440 --> 00:07.010
+it again.
+
+00:07.010 --> 00:14.510
+I'm actually going to talk through it so I can talk through this section with the operating system knowledge
+
+00:14.510 --> 00:15.050
+essentially.
+
+00:15.050 --> 00:15.500
+Right.
+
+00:15.500 --> 00:16.490
+So let's do this.
+
+00:16.490 --> 00:17.990
+Socket programming patterns.
+
+00:17.990 --> 00:22.850
+Now that you are a programmer you can have different patterns.
+
+00:23.000 --> 00:25.190
+We know what an acceptor is right.
+
+00:25.190 --> 00:26.840
+It's the process that accepts.
+
+00:28.100 --> 00:31.460
+So now we have we know the processes of socket programming.
+
+00:31.460 --> 00:32.210
+What do we know.
+
+00:32.480 --> 00:32.780
+Right.
+
+00:32.780 --> 00:35.540
+We know there is an accept.
+
+00:35.540 --> 00:36.770
+We know there is a read.
+
+00:36.770 --> 00:38.000
+There is a write.
+
+00:38.090 --> 00:39.590
+We know there is a listener.
+
+00:39.590 --> 00:41.870
+These are the basic components.
+
+00:41.870 --> 00:47.240
+So what we do, we break them up as their individual logical components.
+
+00:47.240 --> 00:54.260
+And we as a back end programmers, we play with those for scalability and back end engineering.
+
+00:54.750 --> 00:55.950
+So stick.
+
+00:55.950 --> 00:56.910
+Uh, node.
+
+00:56.910 --> 00:57.930
+What node does?
+
+00:57.930 --> 00:59.040
+Very simple thing.
+
+00:59.040 --> 01:04.410
+Simple design node is a single threaded applications framework.
+
+01:05.450 --> 01:08.750
+I know some people are now already yelling at me.
+
+01:08.750 --> 01:09.770
+No it's not.
+
+01:10.010 --> 01:17.180
+Yes, there are threads that node uses, and basically that's the libuv that we talked about.
+
+01:19.430 --> 01:25.160
+Which is a library that offloads all the asynchronous operations for that and that has threads.
+
+01:25.160 --> 01:29.360
+But for the most part, for this is a single thread.
+
+01:30.010 --> 01:31.480
+And that single thread for you.
+
+01:31.480 --> 01:33.040
+A lesson on certain things.
+
+01:33.830 --> 01:40.640
+You create a file descriptor that listens on port 8081 27001.
+
+01:40.640 --> 01:43.250
+Let's say, okay, that's your listener.
+
+01:44.030 --> 01:48.710
+And that same thread that listens owns that file descriptor.
+
+01:48.710 --> 01:52.940
+And that same thread has a loop that accepts.
+
+01:52.940 --> 01:55.820
+So it in itself the acceptor.
+
+01:55.820 --> 01:58.070
+So I created a coin.
+
+01:58.070 --> 02:04.160
+The new word that is the acceptor which is the worker that accepts it could be the same process could
+
+02:04.160 --> 02:05.300
+be a different process.
+
+02:05.300 --> 02:05.660
+Right.
+
+02:05.930 --> 02:07.250
+So there is a listener.
+
+02:07.250 --> 02:12.860
+There is the acceptor that accepts connections and creates more file descriptors, more connections.
+
+02:12.860 --> 02:16.910
+And then there is the reader which reads from the connection.
+
+02:17.540 --> 02:23.210
+And there is also another one that you can add the worker that actually does the work.
+
+02:23.540 --> 02:24.080
+What?
+
+02:24.080 --> 02:30.380
+Because reading is just reading from the kernel receive queue and putting it in your process.
+
+02:30.380 --> 02:39.110
+What do you do with it is up to you who is actually executing the stuff, because once you read it,
+
+02:39.110 --> 02:42.410
+you're going to do something with it and that's another task.
+
+02:44.120 --> 02:44.930
+And guess what?
+
+02:46.180 --> 02:47.500
+Even that.
+
+02:47.500 --> 02:48.910
+What do you do with it?
+
+02:48.940 --> 02:52.660
+Well, the first thing is we're dealing often with protocols, right?
+
+02:54.010 --> 02:55.000
+Because this is DHCP.
+
+02:55.030 --> 02:59.560
+Now higher level built on top we have the HTTP protocol.
+
+02:59.560 --> 03:00.640
+We have SSH protocol.
+
+03:00.640 --> 03:03.910
+We have so many protocols thousands of protocols.
+
+03:04.400 --> 03:10.820
+Those protocols have headers and metadata, and they have, uh, you know, structures and.
+
+03:11.770 --> 03:14.380
+They'll have their own formats.
+
+03:14.380 --> 03:19.060
+They need to be parsed, which takes CPU time.
+
+03:20.700 --> 03:21.180
+Because.
+
+03:21.180 --> 03:23.850
+Oh, I just read this, buy this, buy this, buy this, buy this, buy.
+
+03:24.030 --> 03:25.410
+Oh, find the header.
+
+03:25.410 --> 03:26.430
+Despite this, buy this buy.
+
+03:26.640 --> 03:32.850
+Oh, you want to be more, uh, a little bit, uh, more nuanced.
+
+03:33.450 --> 03:35.070
+I can create my own.
+
+03:36.140 --> 03:37.610
+Logical.
+
+03:38.180 --> 03:39.440
+Decryptor.
+
+03:40.010 --> 03:40.910
+Worker.
+
+03:41.090 --> 03:48.710
+This guy is just the process of encrypting and decrypting SSL traffic.
+
+03:49.930 --> 03:51.550
+Because that's also a job.
+
+03:51.760 --> 03:55.690
+And you can, if you think about it this way, then you can start offloading it.
+
+03:56.020 --> 03:59.830
+I want to put the encryption on another process.
+
+03:59.830 --> 04:01.150
+I want to put the decryption on.
+
+04:01.150 --> 04:04.780
+Another process might be not a good idea, but you can.
+
+04:04.900 --> 04:08.110
+I want to do the actual processing of the protocol.
+
+04:08.110 --> 04:11.140
+Parsing another its own thing the parser.
+
+04:11.560 --> 04:12.250
+What else.
+
+04:12.250 --> 04:13.330
+What else do we have?
+
+04:14.700 --> 04:18.810
+Once you pause the protocol, what do you do with it?
+
+04:18.810 --> 04:19.410
+You guys?
+
+04:20.930 --> 04:25.670
+Well, if you receive, we have this beautiful thing that's called a request.
+
+04:27.050 --> 04:28.550
+What is our request?
+
+04:29.400 --> 04:31.680
+What is really a request I'm asking you.
+
+04:32.130 --> 04:37.620
+It's just a string of bytes that has been parsed, but it has semantics.
+
+04:37.620 --> 04:40.140
+And this semantics are attached with layer seven.
+
+04:40.380 --> 04:45.480
+Uh, you know, application level, uh, concepts.
+
+04:47.180 --> 04:52.190
+And a request like HTTP request that it means to be fulfilled.
+
+04:52.190 --> 04:53.780
+Who is fulfilling this?
+
+04:53.960 --> 05:02.870
+Well, the application who you need to create another worker and that's where the actual work be it
+
+05:02.870 --> 05:03.530
+I'm.
+
+05:04.840 --> 05:08.470
+Uh, it give me all the to do list.
+
+05:08.500 --> 05:09.940
+That's a request.
+
+05:10.670 --> 05:14.420
+Parsing of the protocol as HTTP or HTTP two or HTTP three, whatever.
+
+05:14.420 --> 05:15.890
+That's its own thing.
+
+05:15.890 --> 05:26.750
+But the actual execution of the task to process the to do list, that's in itself a different entity.
+
+05:27.290 --> 05:28.940
+I can put it in my own process.
+
+05:28.940 --> 05:36.740
+If my workload is so CPU bound, I can I can have a pool of worker, I can throw the knowledge stuff
+
+05:36.740 --> 05:37.340
+there.
+
+05:37.340 --> 05:40.670
+You know, I can play with these games.
+
+05:42.170 --> 05:42.770
+Right.
+
+05:42.770 --> 05:44.030
+I can put it in a queue.
+
+05:44.030 --> 05:47.540
+I can execute, pull jobs from the queue and execute it.
+
+05:47.780 --> 05:55.340
+It's so there is unlimited ways to slice and dice this thing and I absolutely love it.
+
+05:55.740 --> 05:56.640
+This.
+
+05:56.760 --> 06:03.810
+I'm certainly you see me rambling about this, but this is truly a book by itself.
+
+06:03.810 --> 06:05.550
+I'm I one day I'm going to write a book.
+
+06:05.550 --> 06:10.140
+I swear, because I cannot keep talking and yapping about all this stuff.
+
+06:10.140 --> 06:13.410
+The details is lost when you speak somehow.
+
+06:13.410 --> 06:19.830
+But the art of writing a book is to say what can never be said.
+
+06:22.680 --> 06:24.600
+Very hard to say all of this stuff, right?
+
+06:24.660 --> 06:27.630
+So writing a book, you can you can freely explore.
+
+06:27.660 --> 06:28.590
+Nobody judge you.
+
+06:28.590 --> 06:29.430
+People judge you.
+
+06:29.430 --> 06:32.490
+If you have a one hour video, so is it one hour?
+
+06:32.490 --> 06:34.680
+This could have been said in three minutes.
+
+06:35.280 --> 06:37.560
+Some of you might already say that about this course.
+
+06:38.810 --> 06:39.590
+But.
+
+06:41.720 --> 06:48.230
+I like to think that I say related things and hopefully they are useful to you.
+
+06:48.230 --> 06:49.820
+But nobody judges a book.
+
+06:49.820 --> 06:54.620
+It's like, oh, this book is like 500 pages that could be condensed in one.
+
+06:54.620 --> 06:56.750
+Nobody say that for some reason, right?
+
+06:56.750 --> 06:57.440
+It's weird.
+
+06:58.130 --> 07:00.560
+So book is a perfect medium.
+
+07:00.560 --> 07:03.140
+Maybe because people read faster than they listen.
+
+07:03.960 --> 07:10.410
+Maybe okay, but yeah, you can break these components and you can play with them.
+
+07:10.410 --> 07:15.150
+So all right I have a listener, I have an acceptor, I have a reader, I have a parser, I have a decoder,
+
+07:15.150 --> 07:20.550
+I have an acceptor, and I have an actual processor to process the request.
+
+07:20.880 --> 07:24.870
+But note example of it does all of this in one thread.
+
+07:25.350 --> 07:27.000
+It calls except for you.
+
+07:27.000 --> 07:31.290
+You don't see it, but it's it does do an strace and you'll see it.
+
+07:35.590 --> 07:40.180
+Then there is a memcached with this approach.
+
+07:41.580 --> 07:42.720
+Which does.
+
+07:43.630 --> 07:46.750
+It has the listener and the acceptors.
+
+07:48.260 --> 07:49.700
+As one socket.
+
+07:49.700 --> 07:57.170
+They have one process that listens and the same process accepts and creates these connections.
+
+07:57.170 --> 08:06.170
+So these connections actually live here technically in the process, but they are siphoned into dedicated
+
+08:06.170 --> 08:07.100
+threads.
+
+08:07.100 --> 08:10.070
+So each thread hey you thread you have this connection.
+
+08:10.070 --> 08:14.570
+Hey you thread, you have handled these two connections so they are sent through IPC.
+
+08:15.110 --> 08:21.530
+Or maybe because they are thread, those already have access to the parent process shared memory so
+
+08:21.530 --> 08:22.940
+you can access those stuff.
+
+08:23.500 --> 08:29.890
+So the single accepting multiple threads does the reading and also maybe the processing, right.
+
+08:31.140 --> 08:33.540
+You're reading all this stuff.
+
+08:33.780 --> 08:38.070
+So because dealing with a lot of connections as a one process is a lot, right?
+
+08:38.550 --> 08:42.750
+You have this massive loop, imagine it and you're looping and you're accepting.
+
+08:42.750 --> 08:44.490
+So I want you to think like this, guys.
+
+08:44.490 --> 08:47.160
+And even in your own.
+
+08:48.560 --> 08:48.920
+Um.
+
+08:49.930 --> 08:52.630
+You know, bubble in your own task.
+
+08:52.630 --> 08:59.530
+Your application might be have the stages of workflows, and you can think of breaking things into multiple
+
+08:59.530 --> 09:00.730
+processes as a result.
+
+09:00.730 --> 09:01.150
+Right.
+
+09:01.150 --> 09:03.850
+Socket management plays this game as well.
+
+09:03.850 --> 09:05.350
+You can do all this stuff.
+
+09:05.350 --> 09:14.620
+And proxies do this because they are so hot, the pathways so hot, and they want to minimize the number
+
+09:14.620 --> 09:19.420
+of latencies because the proxies, you know, packets go through them.
+
+09:19.420 --> 09:22.990
+So we need as minimum latency as possible.
+
+09:24.230 --> 09:26.420
+Ram cloud is an interesting one.
+
+09:26.420 --> 09:28.520
+And here's the thing Ram cloud.
+
+09:28.520 --> 09:30.350
+The whole thing happens in a single process.
+
+09:30.350 --> 09:36.980
+They listen, they accept and they read the packets and they build requests.
+
+09:36.980 --> 09:38.720
+So that means also they decrypt.
+
+09:39.080 --> 09:49.490
+And and then in that object they build a beautiful object that essentially represents the request or
+
+09:49.490 --> 09:50.330
+the message.
+
+09:50.660 --> 09:54.410
+And this message is are sent to the different thread.
+
+09:54.410 --> 09:58.160
+And this is a common model that you might have be familiar with.
+
+09:58.430 --> 10:06.530
+Well, uh, hey, I, uh, I have a single like ArcGIS server that the product I'm responsible partly
+
+10:06.530 --> 10:10.910
+I'm responsible for and my job as does exactly this.
+
+10:11.480 --> 10:18.470
+You know, we're spilling certain pool of threads or processes and in our case, and then we're siphoning
+
+10:18.470 --> 10:24.770
+requests to each thread, and that thread will become busy processing that request until it's actually
+
+10:24.770 --> 10:25.970
+released and come back.
+
+10:25.970 --> 10:26.300
+Right.
+
+10:26.300 --> 10:33.860
+So so this is a very common, you know, uh, example to do to this model Ram, Ram cloud does the same
+
+10:33.860 --> 10:34.700
+thing as well.
+
+10:35.530 --> 10:43.030
+So you essentially assign jobs to threads and ones that the job is finished, you come back and you
+
+10:43.030 --> 10:45.790
+report the output, you know.
+
+10:47.850 --> 10:49.410
+Here's how nginx does it.
+
+10:49.410 --> 10:50.640
+It's very interesting.
+
+10:51.610 --> 10:53.920
+Nginx a.
+
+10:56.670 --> 10:57.420
+Uh.
+
+10:59.190 --> 11:03.420
+Actually I say threads, but I think they use processes I can't remember now.
+
+11:03.930 --> 11:04.350
+Right.
+
+11:04.380 --> 11:05.370
+Regardless.
+
+11:06.260 --> 11:09.290
+Hendricks forks these processes, right?
+
+11:09.320 --> 11:14.660
+You have one listener, and then all of these guys will have multiple threads.
+
+11:14.660 --> 11:18.770
+And all of them listen on, uh, except on the same socket.
+
+11:18.920 --> 11:21.020
+So what what is the limitation of this.
+
+11:21.020 --> 11:25.220
+You have a single socket and then the limitation is everywhere.
+
+11:25.220 --> 11:25.550
+Really.
+
+11:25.550 --> 11:28.580
+Here, here you're not accepting fast enough.
+
+11:28.580 --> 11:30.890
+Here you're not accepting fast enough here.
+
+11:30.890 --> 11:34.910
+You're not accepting fast enough because you have you have a lot of users coming in.
+
+11:34.910 --> 11:40.250
+But here you're actually actually increasing the number of acceptors.
+
+11:40.250 --> 11:40.790
+Right.
+
+11:41.240 --> 11:44.360
+Because acceptors and readers, every acceptor is also a reader.
+
+11:44.360 --> 11:48.680
+In this particular case, every acceptor owns the connection and they also read from it.
+
+11:48.680 --> 11:50.360
+But you have a single listener.
+
+11:50.360 --> 11:51.800
+So the single socket.
+
+11:51.800 --> 11:53.270
+So a single accept queue.
+
+11:53.270 --> 11:56.030
+And all of these people fighting over the accept queue.
+
+11:56.030 --> 11:58.370
+And what happened when you accept.
+
+11:59.290 --> 11:59.770
+Guess what?
+
+11:59.770 --> 12:00.760
+This is a memory.
+
+12:00.790 --> 12:02.350
+Shared memory.
+
+12:02.620 --> 12:03.610
+Multiple stuff.
+
+12:03.610 --> 12:04.810
+What do we need to do?
+
+12:04.840 --> 12:05.770
+You guessed it.
+
+12:05.770 --> 12:06.760
+Mutexes.
+
+12:06.760 --> 12:08.110
+We talked about this.
+
+12:08.110 --> 12:09.250
+Yeah.
+
+12:09.250 --> 12:11.890
+We cannot have two people except at the same time.
+
+12:11.890 --> 12:13.090
+That's dangerous.
+
+12:13.390 --> 12:15.220
+We could run into race conditions.
+
+12:15.220 --> 12:18.910
+So the kernel acquire a mutex on the accept queue.
+
+12:18.910 --> 12:26.080
+So if I accept two, uh, connections, uh, two threads, except at the same time, uh, they are blocked.
+
+12:26.200 --> 12:30.310
+One accepts update the queue or the hash table.
+
+12:30.310 --> 12:30.700
+Really.
+
+12:30.700 --> 12:32.260
+And then release.
+
+12:32.560 --> 12:33.670
+And now you can get in.
+
+12:33.670 --> 12:38.530
+Otherwise both connections, both threads will accept the same connections.
+
+12:38.530 --> 12:39.190
+Yikes.
+
+12:39.190 --> 12:40.360
+You don't want to do that.
+
+12:41.170 --> 12:42.220
+That will be dangerous.
+
+12:42.220 --> 12:45.070
+You will have two files pointing to the same connection.
+
+12:45.070 --> 12:47.770
+God knows what could go wrong, right?
+
+12:48.400 --> 12:55.780
+Oh yeah, you're of absolute corruption because one connection, one data will go to this receive queue.
+
+12:55.780 --> 12:57.370
+One data will go to that receive queue.
+
+12:57.400 --> 12:57.580
+Yeah.
+
+12:57.580 --> 13:00.970
+You're done that connection is corrupt right.
+
+13:00.970 --> 13:05.680
+So you want to protect your mutexes on that case on the accept queue.
+
+13:05.680 --> 13:06.070
+Right.
+
+13:06.070 --> 13:06.970
+So yeah.
+
+13:06.970 --> 13:08.740
+Yeah play with that games.
+
+13:08.740 --> 13:11.680
+But then you have this bottleneck right.
+
+13:11.680 --> 13:13.480
+So you cannot really accept fast enough.
+
+13:13.480 --> 13:19.720
+You're, you're faster than this, but you're not still fast because you're blocked on the mutex.
+
+13:19.720 --> 13:20.920
+So what do you do.
+
+13:21.550 --> 13:24.220
+Meats or use port which we talked about.
+
+13:24.220 --> 13:24.640
+Right.
+
+13:25.120 --> 13:27.850
+The way we do is everyone is a listener.
+
+13:27.850 --> 13:29.230
+They all listen on the same port.
+
+13:29.230 --> 13:32.050
+So they each have their own accept queue.
+
+13:32.080 --> 13:37.570
+Technically they have their own socket and as a result they have their own accept queue.
+
+13:37.570 --> 13:38.260
+I'm not.
+
+13:38.260 --> 13:43.630
+Don't quote me on this n q I don't know if they share this in queue because I would share it to be honest,
+
+13:43.630 --> 13:52.810
+but but definitely they have a dedicated accept queue right on the same port and the same IP.
+
+13:52.840 --> 13:54.070
+Yes.
+
+13:54.250 --> 14:01.330
+So now and the OS, you know, uh, distributes the accept queues essentially on the connections on
+
+14:01.330 --> 14:01.990
+the accept queues.
+
+14:01.990 --> 14:04.600
+So now if I'm accepting I'm accepting my queue.
+
+14:05.520 --> 14:06.990
+There is no locks.
+
+14:06.990 --> 14:08.490
+I don't need a mutex.
+
+14:08.490 --> 14:09.660
+I'm the only listener.
+
+14:09.660 --> 14:10.770
+I'm the only acceptor.
+
+14:10.770 --> 14:12.390
+It's my accept queue.
+
+14:12.390 --> 14:14.790
+And this guy is it's its accept queue.
+
+14:14.790 --> 14:15.750
+So there is no mutex.
+
+14:15.750 --> 14:16.830
+There is no locking.
+
+14:16.830 --> 14:18.990
+So you can have a ten of those.
+
+14:18.990 --> 14:20.550
+They all accept connections.
+
+14:20.550 --> 14:27.900
+So this is the fastest way to accept as much connections as possible without getting into, you know,
+
+14:27.900 --> 14:29.040
+blocking issues.
+
+14:29.430 --> 14:29.790
+Right.
+
+14:30.480 --> 14:31.830
+But do you need it.
+
+14:32.550 --> 14:37.650
+Probably not like I'm talking about Cloudflare is nginx, is it?
+
+14:37.650 --> 14:38.340
+You know.
+
+14:39.350 --> 14:45.890
+A server that receives millions of connections, you know, thousands of connections per second.
+
+14:45.890 --> 14:48.860
+And that basically the last one that I wanted to talk about.
+
+14:48.860 --> 14:56.660
+So you see how you can build and scale by just understanding these basic data structures.
+
+14:56.660 --> 15:01.040
+It is so absolutely fascinating in my opinion.
+
+15:02.040 --> 15:03.390
+There in the next lecture, you guys.

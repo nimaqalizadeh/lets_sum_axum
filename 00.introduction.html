@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-7272b4e1.js";
+            window.path_to_searchindex_js = "searchindex-d035bc48.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-4ceebe16.js"></script>
+        <script src="toc-51710b19.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -393,100 +393,6 @@ where
 }
 <span class="boring">}</span></code></pre>
 <p>This method of running a service is intentionally simple and doesn’t expose any configuration knobs — no custom timeouts, no TLS, no graceful-shutdown hooks, none of that. If you need any of it, drop down to <code>hyper</code> or <code>hyper-util</code> directly and wire the router in yourself; <code>axum::serve</code> is just the convenient default for the common case.</p>
-<blockquote>
-<h2 id="under-the-hood-what-axumserve-actually-does-optional-deep-dive--safe-to-skip"><a class="header" href="#under-the-hood-what-axumserve-actually-does-optional-deep-dive--safe-to-skip">Under the hood: what <code>axum::serve</code> actually does (optional deep dive — safe to skip)</a></h2>
-<p>The signature above is dense, so it’s worth walking through what happens between a client opening a TCP connection and your handler running. Most of this is really <code>hyper</code> + <code>tokio</code> doing the work — Axum is just the glue that produces the right service for each connection. This section is background reading; you don’t need any of it to write Axum handlers, so feel free to skip ahead.</p>
-<h3 id="sockets-file-descriptors-and-everything-is-a-file"><a class="header" href="#sockets-file-descriptors-and-everything-is-a-file">Sockets, file descriptors, and “everything is a file”</a></h3>
-<p>A <strong>socket</strong> is a kernel-managed communication endpoint. It’s the kernel’s data structure that tracks one side of a network conversation: the local IP+port, the remote IP+port, the protocol (TCP/UDP), buffers for incoming and outgoing bytes, and connection state.</p>
-<p>Your process doesn’t touch any of that directly. The kernel hands your process a <strong>file descriptor</strong> — a small integer like <code>3</code>, <code>4</code>, <code>5</code> — that indexes into a per-process table. That entry points to the kernel’s socket structure.</p>
-<p>On Linux, “everything is a file” is a generalization of exactly this idea. A file descriptor can refer to a regular file on disk, a pipe, a terminal, a block device, a socket, an <code>epoll</code> instance, and so on. They’re all “files” because they all support the same core syscalls — <code>read()</code>, <code>write()</code>, <code>close()</code> — and can be polled with <code>select</code>/<code>poll</code>/<code>epoll</code>. The kernel dispatches those syscalls to different internal implementations based on what kind of object the fd points to. For a socket, <code>read()</code> pulls bytes out of the receive buffer; <code>write()</code> queues bytes into the send buffer for the NIC to transmit.</p>
-<p>That uniformity is why a single <code>epoll</code> loop in Tokio can wait on thousands of sockets, pipes, and timers with one mechanism.</p>
-<h3 id="opening-a-socket-for-a-server"><a class="header" href="#opening-a-socket-for-a-server">“Opening a socket” for a server</a></h3>
-<p>There’s no <code>open("socket")</code>. The sequence a TCP server goes through is:</p>
-<ol>
-<li><strong><code>socket(AF_INET, SOCK_STREAM, 0)</code></strong> — the kernel allocates a socket structure and returns a new fd. At this point it has no address and no connection.</li>
-<li><strong><code>bind(fd, addr)</code></strong> — associates the socket with a local IP and port (<code>0.0.0.0:3000</code>). The kernel now knows packets arriving at that port belong to this socket. If something else already owns the port, this fails with <code>EADDRINUSE</code>.</li>
-<li><strong><code>listen(fd, backlog)</code></strong> — flips the socket into “passive” mode. The kernel sets up a queue for incoming connection attempts and starts accepting SYN packets. <code>backlog</code> is how many half-open/pending connections to queue before dropping new ones.</li>
-<li><strong><code>accept(fd)</code></strong> — blocks (or, in async, registers interest with <code>epoll</code>) until a client completes the TCP three-way handshake. When one does, the kernel creates a <strong>new</strong> socket — a new fd — representing <em>that specific connection</em>, with the remote address filled in. The original listening fd keeps accepting more connections.</li>
-</ol>
-<p>So after <code>accept</code>, a server holds <strong>two kinds of fds</strong>: one listener fd that keeps accepting, and one per-connection fd for each active client.</p>
-<p><code>tokio::net::TcpListener::bind("0.0.0.0:3000")</code> is really <code>socket()</code> + <code>bind()</code> + <code>listen()</code>. Each value returned by <code>listener.accept().await</code> is a <code>TcpStream</code> wrapping a per-connection fd.</p>
-<h3 id="how-the-kernel-routes-incoming-packets-to-the-right-socket"><a class="header" href="#how-the-kernel-routes-incoming-packets-to-the-right-socket">How the kernel routes incoming packets to the right socket</a></h3>
-<p>Every TCP socket is uniquely identified by a <strong>4-tuple</strong>:</p>
-<pre><code>(local IP, local port, remote IP, remote port)
-</code></pre>
-<p>The kernel keeps a hash table of all active sockets keyed by this tuple. When a packet arrives on the NIC, the kernel reads the IP and TCP headers, builds the 4-tuple, looks it up in the table, and appends the payload bytes to the matching socket’s receive buffer — then wakes up whatever was waiting on that fd.</p>
-<p>Say your server is bound to <code>0.0.0.0:3000</code>. The listener socket is registered with a partial tuple <code>(local=*:3000, remote=*:*, state=LISTEN)</code> — it matches any incoming SYN to port 3000 whose full 4-tuple doesn’t already match an established socket.</p>
-<p>When client A (<code>1.2.3.4:51000</code>) finishes the handshake, the kernel creates a new socket:</p>
-<pre><code>(local=10.0.0.5:3000, remote=1.2.3.4:51000, state=ESTABLISHED)
-</code></pre>
-<p>Client B (<code>9.8.7.6:62000</code>) connects and gets:</p>
-<pre><code>(local=10.0.0.5:3000, remote=9.8.7.6:62000, state=ESTABLISHED)
-</code></pre>
-<p>Both share the same local port 3000 — that’s fine, because the kernel demultiplexes by the <strong>full 4-tuple</strong>, not just the local port. When Client A’s next TCP segment arrives, the kernel finds Client A’s socket by tuple match and puts the bytes in its recv buffer. Client B’s data goes to Client B’s socket. No mixing.</p>
-<h3 id="one-socket-per-connection-not-per-request"><a class="header" href="#one-socket-per-connection-not-per-request">One socket per connection, not per request</a></h3>
-<p>A common confusion: you don’t get one socket per HTTP request. The unit is the <strong>connection</strong>.</p>
-<p>First, the vocabulary:</p>
-<ul>
-<li>A <strong>connection</strong> is the transport-layer pipe. For HTTP/1.x and HTTP/2, that’s a TCP connection: established by the 3-way handshake, identified by the 4-tuple <code>(local IP, local port, remote IP, remote port)</code>, torn down by FIN/RST. It’s just bidirectional bytes — TCP doesn’t know the word “request”.</li>
-<li>A <strong>request</strong> is an application-layer message defined by HTTP: method + path + headers + optional body. A response is the matching reply.</li>
-</ul>
-<p>The two are <strong>not 1:1</strong>, and the ratio has changed across HTTP versions:</p>
-<ul>
-<li><strong>HTTP/1.0 (no keep-alive)</strong>: 1 connection = 1 request + 1 response, then close. New TCP handshake (and TLS handshake) per request — expensive.</li>
-<li><strong>HTTP/1.1 with keep-alive</strong>: client sends a request → server responds → the socket stays open → client sends another request on the same socket. Many sequential requests on one connection; handshake paid once.</li>
-<li><strong>HTTP/2</strong>: many requests/responses are <strong>multiplexed concurrently</strong> over a single socket using stream IDs. Request #2 doesn’t wait for #1’s response.</li>
-<li><strong>HTTP/3</strong>: same multiplexing idea, but over QUIC on UDP.</li>
-</ul>
-<p>So a connection is a <em>container</em> that can carry 0, 1, or many requests over its lifetime.</p>
-<p>So a browser loading a page with 50 assets from your server might use only 1–6 sockets total, not 50. Nothing at the kernel level distinguishes “request 1” from “request 2” on the same connection — they’re just a byte stream. The HTTP parser on top is what finds request boundaries (<code>\r\n\r\n</code> ends headers, <code>Content-Length</code> or chunked encoding delimits the body).</p>
-<h3 id="the-makeservice--service-split"><a class="header" href="#the-makeservice--service-split">The MakeService / Service split</a></h3>
-<p>Now back to the <code>serve</code> signature. <code>serve</code> takes a <code>MakeService</code> — a factory. Every time a new TCP connection is accepted, it calls this factory to produce a fresh <code>Service</code> dedicated to that connection:</p>
-<pre><code>Connection arrives ──► MakeService::call() ──► returns a Service
-                                                   │
-                       Request on that connection ─┴─► Service::call(req) ──► Response
-</code></pre>
-<p>There are two layers:</p>
-<ul>
-<li><strong><code>MakeService</code></strong> — called once per connection.</li>
-<li><strong><code>Service</code></strong> — called once per request (potentially many times on one connection).</li>
-</ul>
-<p>The <code>Service</code> trait, from <code>tower</code>, is essentially:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>async fn call(&amp;mut self, req: Request) -&gt; Result&lt;Response, Error&gt;
-<span class="boring">}</span></code></pre>
-<p>An <code>axum::Router</code> implements both <code>MakeService</code> and <code>Service</code>, which is why you can hand one to <code>serve</code> directly.</p>
-<p>Per-connection services make connection-scoped state (e.g. an HTTP/2 stream counter, or per-connection middleware state) cheap: it can live in the service instance without locking. Shared state (DB pools, config) goes in <code>Arc</code>s held inside the router and cloned into each connection’s service.</p>
-<h3 id="the-accept-loop-end-to-end"><a class="header" href="#the-accept-loop-end-to-end">The accept loop, end to end</a></h3>
-<p>Putting it together, <code>axum::serve(listener, router).await</code> runs an infinite loop:</p>
-<ol>
-<li><code>listener.accept().await</code> — waits for a TCP connection. Returns a new per-connection fd.</li>
-<li><code>tokio::spawn(...)</code> — spawns a task to own that connection. The accept loop immediately goes back to waiting; it never blocks on a single connection.</li>
-<li>Inside the spawned task, <code>serve</code> calls the <code>MakeService</code> (the router, cloned) to produce a <code>Service</code> scoped to this connection.</li>
-<li><code>hyper</code> drives the connection: reads bytes off the socket, parses an HTTP request (allocating heap memory for headers and body buffers), and calls <code>service.call(request).await</code>.</li>
-<li>The router matches path + method, runs extractors, and calls your handler <code>.await</code>.</li>
-<li>When your handler awaits something (a DB query, a downstream HTTP call), the task is parked. The OS thread it was running on is free to poll <em>other</em> tasks. When the awaited future is ready, the runtime resumes the task — possibly on a different thread.</li>
-<li><code>hyper</code> serializes the <code>Response</code> back onto the same socket.</li>
-<li>On HTTP/1.1 keep-alive or HTTP/2, step 4 repeats for more requests on the same socket, reusing the same <code>Service</code> instance.</li>
-<li>When the connection closes, the spawned task ends and its allocations are dropped.</li>
-</ol>
-<p><code>serve</code> itself never returns unless the listener errors out or graceful shutdown is triggered. Everything async/await-related — yielding on I/O waits, multiplexing tasks across threads — is the Tokio runtime’s job, not <code>serve</code>’s. <code>serve</code> is just the accept loop + the per-connection <code>MakeService</code> call + handoff to <code>hyper</code>.</p>
-<h3 id="where-memory-lives"><a class="header" href="#where-memory-lives">Where memory lives</a></h3>
-<ul>
-<li><strong>Per-connection state</strong> (hyper’s parser buffers, the <code>Service</code> instance): owned by the spawned task. Dropped when the connection closes.</li>
-<li><strong>Per-request state</strong> (parsed headers, body bytes, extractors, handler locals): lives on the task’s stack and heap during <code>service.call</code>. Dropped after the response is written.</li>
-<li><strong>Shared state</strong> (DB pools, config, caches): lives in <code>Arc</code>s held by the router and cloned cheaply into each per-connection service.</li>
-</ul>
-<h3 id="why-the-trait-bounds-look-scary"><a class="header" href="#why-the-trait-bounds-look-scary">Why the trait bounds look scary</a></h3>
-<p>The <code>where</code> clauses on <code>serve</code> — <code>Service&lt;Request&gt; + Send + 'static</code>, <code>S::Future: Send</code>, <code>Error = Infallible</code>, and friends — aren’t adding behavior. They exist because:</p>
-<ul>
-<li>Each connection runs in a <strong>spawned Tokio task</strong>, so everything crossing into it must be <code>Send + 'static</code>.</li>
-<li>The response must be a valid HTTP body that <code>hyper</code> can serialize.</li>
-<li>Errors must be convertible into something <code>hyper</code> can report (<code>Infallible</code> here means routing itself cannot fail — handler errors are turned into responses before they reach this layer).</li>
-</ul>
-<p>They’re the compiler’s way of making sure the types are actually shippable between threads and compatible with <code>hyper</code>’s I/O, nothing more.</p>
-</blockquote>
 
                     </main>
 

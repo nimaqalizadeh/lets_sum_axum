@@ -1,0 +1,731 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>File descriptors - Let&#x27;s sum Axum</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-d035bc48.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-51710b19.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Let&#x27;s sum Axum</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="file-descriptors"><a class="header" href="#file-descriptors">File descriptors</a></h1>
+<h2 id="file-descriptors-your-ticket-to-something-the-kernel-owns"><a class="header" href="#file-descriptors-your-ticket-to-something-the-kernel-owns">File descriptors: your ticket to something the kernel owns</a></h2>
+<p>Before anything else, a word on <strong>file descriptors</strong> (fds) — the small integers like <code>3</code>, <code>4</code>, <code>5</code> you’ll see all over this chapter. If the concept already feels obvious, skip ahead. If you’ve only half-followed the phrase “the kernel hands your process a file descriptor,” this section is for you.</p>
+<p><strong>The coat-check analogy.</strong> Picture a coat check at a restaurant. You hand over your coat; the attendant hangs it on hook 37 and gives you a little ticket numbered <code>37</code>. You don’t go behind the counter. To get your coat back, you hand over the ticket; the attendant uses the number to find your coat.</p>
+<p>A file descriptor is that ticket. The “coats” (sockets, files, pipes, timers) live in kernel memory — a place your program can’t touch directly. You ask the kernel to open something; it sets up the thing internally and hands you back a number. From then on, every time you want to do something with that thing, you tell the kernel the number.</p>
+<p><strong>Why a number, not a pointer?</strong> Two reasons.</p>
+<ul>
+<li><strong>Security.</strong> If syscalls took kernel pointers from userspace, any process could forge one and read or corrupt kernel memory. A number is safe — the kernel validates it against <em>your</em> private list on every call.</li>
+<li><strong>Uniformity.</strong> If every I/O thing gets a number, then one set of verbs (<code>read</code>, <code>write</code>, <code>close</code>) works on <em>all</em> of them, and the kernel dispatches to the right implementation based on what the number points to. That’s the whole meaning of “everything is a file.”</li>
+</ul>
+<p><strong>What the number indexes.</strong> Every running process has a small private list the kernel maintains for it — the <strong>file descriptor table</strong>. Entry 0, entry 1, entry 2, entry 3, … Each entry is either empty or points to an open resource.</p>
+<p>One thing to be precise about upfront: <strong>the fd <em>is</em> the index into this table.</strong> When we say “fd 3” and “entry 3,” that’s the <em>same</em> integer, not two numbers with a translation between them. <code>socket()</code> returns an integer — say <code>3</code> — and that very integer is both “your file descriptor” and “the position in your fd table where the kernel stored the pointer to the socket.” There’s no <code>fd → slot</code> lookup step; the fd and the slot number are the same number.</p>
+<pre><code class="language-text">   Your process's fd table            What each slot points to
+   ──────────────────────             ────────────────────────
+   0  ─────────────────────────►      stdin   (keyboard / input pipe)
+   1  ─────────────────────────►      stdout  (terminal / output pipe)
+   2  ─────────────────────────►      stderr  (terminal / error pipe)
+   3  ─────────────────────────►      a socket
+   4  ─────────────────────────►      an open file
+   5  ─────────────────────────►      (empty)
+   ...
+</code></pre>
+<p>The first three are pre-opened for you when the shell launches your program (stdin, stdout, stderr). Slots 3 and up are assigned lowest-empty-first as you open things. When you <code>close(3)</code>, slot 3 empties and the next <code>open()</code> or <code>socket()</code> gets reused there.</p>
+<p><strong>The whole flow.</strong> You call <code>socket()</code> — the kernel allocates a socket struct (the thing we describe in the next section), stores a pointer to it at entry <code>3</code> of your fd table, and returns the integer <code>3</code> to you. From then on, every syscall you pass <code>3</code> to reads <em>that same entry</em>:</p>
+<ul>
+<li><code>read(3, buf, n)</code> → kernel reads <code>fd_table[3]</code> → finds the socket → drains bytes from its receive buffer into <code>buf</code>.</li>
+<li><code>write(3, buf, n)</code> → kernel reads <code>fd_table[3]</code> → finds the socket → queues bytes into its send buffer.</li>
+<li><code>close(3)</code> → kernel empties <code>fd_table[3]</code>; if nothing else points to the socket, it’s torn down.</li>
+</ul>
+<p>The same commands, with a different fd, act on a completely different resource:</p>
+<ul>
+<li><code>read(4, buf, n)</code> where 4 is an open file → reads from disk via the page cache.</li>
+<li><code>read(0, buf, n)</code> → reads whatever the user typed on the keyboard.</li>
+</ul>
+<p>The syscall API is uniform; the <em>implementation</em> varies based on what the fd actually refers to. This is why <code>epoll</code> (section 4) can wait on any mix of sockets, pipes, and timers with one mechanism — they all speak the same fd vocabulary.</p>
+<p><strong>Scope: one table per process, shared across threads.</strong> Worth being precise about this because it’s one of the defining differences between threads and processes.</p>
+<pre><code class="language-text">   Process A (pid 100)                 Process B (pid 200)
+   ──────────────────────              ──────────────────────
+   shared fd table:                    shared fd table:
+   fd 0 ──► stdin                      fd 0 ──► stdin
+   fd 1 ──► stdout                     fd 1 ──► stdout
+   fd 2 ──► stderr                     fd 2 ──► stderr
+   fd 3 ──► socket X                   fd 3 ──► (empty)
+   fd 4 ──► config file                fd 4 ──► socket Y
+          ▲                                   ▲
+          │ every thread in A                 │ every thread in B
+     ┌────┼────┬────┐                    ┌────┼────┐
+     T1   T2   T3   T4                   T5   T6   T7
+</code></pre>
+<p>Two takeaways:</p>
+<ul>
+<li><strong>Different processes = different tables.</strong> Process A’s fd 3 and Process B’s fd 3 are unrelated — they just happen to both be the number 3 in their respective tables. <code>read(3, …)</code> in A drains socket X; the same call in B would hit whatever B has at slot 3 (nothing, here).</li>
+<li><strong>Threads inside a process share one table.</strong> If T1 opens a file and gets back <code>5</code>, then T2 and T3 can immediately use <code>read(5, …)</code> — it works because they share the table. If T1 <code>close(5)</code>s, the slot empties for <em>every</em> thread, and if T3 then opens something new it might be handed <code>5</code> back — silently aliasing whatever T2 still thought it was using. This is a real class of multi-threaded bug.</li>
+</ul>
+<p>This sharing is the main reason threads are cheaper than processes: the kernel doesn’t duplicate the fd table (or the address space, or a bunch of other per-task state) when it spawns a thread. Under the hood on Linux, both processes and threads are created by the same <code>clone()</code> syscall with different flags; <code>CLONE_FILES</code> is the one that says “share the caller’s fd table” instead of copying it.</p>
+<p><strong>Sidebar: what exactly <em>is</em> a thread vs a process?</strong> A common half-truth is “threads are just processes.” Close, but worth being precise. On Linux the kernel has a single abstraction called a <strong>task</strong>, and <code>clone()</code> creates one. What makes that new task “a thread” vs “a process” is which sharing flags you pass:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th><code>clone()</code> flag</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>CLONE_VM</code></td><td>share <strong>memory</strong> (address space)</td></tr>
+<tr><td><code>CLONE_FILES</code></td><td>share <strong>fd table</strong></td></tr>
+<tr><td><code>CLONE_SIGHAND</code></td><td>share signal handlers</td></tr>
+<tr><td><code>CLONE_THREAD</code></td><td>same thread group (same PID as seen by <code>getpid()</code>)</td></tr>
+<tr><td>(none of the above)</td><td>plain <code>fork</code> — copy everything</td></tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li><strong>Process</strong> = <code>clone()</code> with <em>none</em> of the sharing flags → the new task gets copies of everything.</li>
+<li><strong>Thread</strong> = <code>clone()</code> with all of them → the new task shares with its creator.</li>
+</ul>
+<p>So: <strong>a thread is an execution context (stack + registers) running inside a process</strong>, not a miniature process of its own. A process always starts with exactly one thread (the “main thread”); spawning more threads multiplies the <em>runners</em> without multiplying the <em>environment</em>.</p>
+<p>Here’s how memory and kernel state split between threads of one process:</p>
+<pre><code class="language-text">   Process P (one address space)
+   ┌──────────────────────────────────────────────────────────┐
+   │  CODE / TEXT         ◄── shared by all threads           │
+   │  (compiled instructions, read-only)                      │
+   ├──────────────────────────────────────────────────────────┤
+   │  DATA / BSS          ◄── shared (globals, statics)       │
+   ├──────────────────────────────────────────────────────────┤
+   │  HEAP                ◄── shared (Box, Vec, String, ...)  │
+   │                          THIS is why Rust has Arc,       │
+   │   ... grows up ...       Mutex, RwLock                   │
+   │                                                          │
+   ├──────────────────────────────────────────────────────────┤
+   │                                                          │
+   │   ... stacks grow down ...                               │
+   │                                                          │
+   │  T1 stack  ◄── private to thread 1 (locals, call frames) │
+   │  T2 stack  ◄── private to thread 2                       │
+   │  T3 stack  ◄── private to thread 3                       │
+   └──────────────────────────────────────────────────────────┘
+
+   Also shared across threads: fd table, signal handlers,
+   current working directory, process ID, env vars.
+
+   Also private per thread: CPU registers (including program
+   counter and stack pointer), thread-local storage (TLS),
+   the kernel-side scheduling slot.
+</code></pre>
+<p>Quick reference:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>Shared across threads</th><th>Private per thread</th></tr>
+</thead>
+<tbody>
+<tr><td>Code (text segment)</td><td>✅</td><td></td></tr>
+<tr><td>Globals / statics</td><td>✅</td><td></td></tr>
+<tr><td>Heap</td><td>✅</td><td></td></tr>
+<tr><td>Fd table</td><td>✅</td><td></td></tr>
+<tr><td>Signal handlers, cwd</td><td>✅</td><td></td></tr>
+<tr><td><strong>Stack</strong></td><td></td><td>✅</td></tr>
+<tr><td><strong>CPU registers (PC, SP)</strong></td><td></td><td>✅</td></tr>
+<tr><td><strong>Thread-local storage</strong></td><td></td><td>✅</td></tr>
+<tr><td><strong>Kernel scheduling slot</strong></td><td></td><td>✅</td></tr>
+</tbody>
+</table>
+</div>
+<p>Private registers (including the program counter) are what let two threads be at <em>different lines of code</em> simultaneously. Private stacks are why a function’s locals in T1 don’t clobber the same function running in T2. Shared heap is where they collaborate — and is why <code>Arc&lt;Mutex&lt;…&gt;&gt;</code> exists in Rust.</p>
+<p><strong>Seeing it in action.</strong> The abstractions above are much easier to trust once you’ve <em>watched</em> them on your own machine. Each experiment below is a tiny Rust program plus a shell command you run in another terminal. They’re all independent — do them in any order. Everything assumes Linux (<code>/proc</code> is Linux-only; on macOS replace <code>/proc/$PID/fd</code> with <code>lsof -p $PID</code>).</p>
+<p><strong>Experiment 1: threads share a PID but have different TIDs.</strong> A process has one PID; every thread inside it has its own TID (thread ID). Let’s print them both.</p>
+<pre class="playground"><code class="language-rust">// Cargo.toml: [dependencies] libc = "0.2"
+use std::thread;
+use std::time::Duration;
+
+fn gettid() -&gt; i64 {
+    // On Linux, SYS_gettid returns the kernel's TID of the calling thread.
+    unsafe { libc::syscall(libc::SYS_gettid) }
+}
+
+fn main() {
+    let pid = std::process::id();
+    println!("main    pid={pid}  tid={}  — inspect from another shell, then Ctrl-C to exit", gettid());
+
+    let handles: Vec&lt;_&gt; = (0..3)
+        .map(|i| thread::spawn(move || {
+            println!("worker{i} pid={}  tid={}", std::process::id(), gettid());
+            // Keep the thread alive so ps / /proc can see it from another shell.
+            thread::sleep(Duration::from_secs(120));
+        }))
+        .collect();
+
+    for h in handles { h.join().unwrap(); }
+}</code></pre>
+<p>Sample output (yours will differ):</p>
+<pre><code class="language-text">main    pid=48211  tid=48211  — inspect from another shell, then Ctrl-C to exit
+worker0 pid=48211  tid=48212
+worker1 pid=48211  tid=48213
+worker2 pid=48211  tid=48214
+</code></pre>
+<p>Observe: <strong>same PID everywhere, different TIDs.</strong> And the main thread’s TID equals the PID — that’s the “main thread is the process’s first task” point from above.</p>
+<p>The <code>thread::sleep(120s)</code> inside each worker is what makes “inspect from another shell” actually work — without it, the threads finish in a millisecond and are gone before you can look. While the program is still running, open a <strong>second shell</strong> (a new terminal, or <code>docker exec -it &lt;name&gt; bash</code> if you’re using a container) and cross-check with the kernel directly — use the PID printed by the program itself:</p>
+<pre><code class="language-bash">PID=48211                         # the number your program printed
+
+ps -T -p $PID                     # -T shows threads; one row per TID
+ls /proc/$PID/task/               # one directory per thread; names are TIDs
+</code></pre>
+<p>If you forgot to note the PID, find it by binary name instead: <code>pgrep -fn your_binary</code> (replace <code>your_binary</code> with whatever <code>cargo run</code> produced — typically your package name from <code>Cargo.toml</code>). Hit <strong>Ctrl-C</strong> in the first shell when you’re done.</p>
+<p><strong>Experiment 2: <code>fork()</code> gives you two processes with two different PIDs, but they share the socket.</strong> Add this to your <code>Cargo.toml</code> — <code>nix</code> gates <code>fork</code> / <code>getpid</code> behind feature flags, so the plain <code>nix = "0.29"</code> line won’t compile:</p>
+<pre><code class="language-toml">[dependencies]
+nix = { version = "0.29", features = ["process", "user"] }
+</code></pre>
+<pre class="playground"><code class="language-rust">use nix::unistd::{fork, ForkResult, getpid, getppid};
+use std::net::TcpListener;
+use std::{thread, time::Duration};
+
+fn main() {
+    let listener = TcpListener::bind("127.0.0.1:9000").unwrap();
+    println!("[parent-before-fork] pid={}  listener fd bound", getpid());
+
+    match unsafe { fork() }.unwrap() {
+        ForkResult::Parent { child } =&gt; {
+            println!("[parent] my pid={}  child pid={}", getpid(), child);
+            thread::sleep(Duration::from_secs(60));
+        }
+        ForkResult::Child =&gt; {
+            println!("[child]  my pid={}  parent pid={}", getpid(), getppid());
+            thread::sleep(Duration::from_secs(60));
+        }
+    }
+    drop(listener);
+}</code></pre>
+<p>Sample output:</p>
+<pre><code class="language-text">[parent-before-fork] pid=51002  listener fd bound
+[parent] my pid=51002  child pid=51003
+[child]  my pid=51003  parent pid=51002
+</code></pre>
+<p>Now, while the program sleeps, inspect <strong>both</strong> fd tables from another terminal:</p>
+<pre><code class="language-bash">ls -l /proc/51002/fd            # parent
+ls -l /proc/51003/fd            # child
+</code></pre>
+<p>You’ll see the <em>same</em> fd number (usually <code>3</code>) in each, and its symlink target will be something like <code>socket:[2093471]</code> — <strong>the number in brackets is the kernel’s socket inode and it’s identical in both listings.</strong> Two fd tables, same underlying socket. That’s the “separate tables, shared socket” picture made literal.</p>
+<p>binary named <code>fd_lab</code>, PID 51002</p>
+<pre><code class="language-text">$ lsof -p 51002
+COMMAND  PID USER  FD   TYPE DEVICE SIZE/OFF    NODE NAME
+fd_lab  1343 root cwd    DIR   0,56     4096  545203 /fd_lab
+fd_lab  1343 root rtd    DIR   0,56     4096  545148 /
+fd_lab  1343 root txt    REG   0,56  5087016  549008 /fd_lab/target/debug/fd_lab
+fd_lab  1343 root mem    REG   0,56  1995216 3710929 /usr/lib/x86_64-linux-gnu/libc.so.6
+fd_lab  1343 root mem    REG   0,56   182856 3710944 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+fd_lab  1343 root mem    REG   0,56   225672 3710909 /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fd_lab  1343 root   0u   CHR  136,3      0t0       6 /dev/pts/3
+fd_lab  1343 root   1u   CHR  136,3      0t0       6 /dev/pts/3
+fd_lab  1343 root   2u   CHR  136,3      0t0       6 /dev/pts/3
+fd_lab  1343 root   3u  IPv4 103758      0t0     TCP localhost:9000 (LISTEN)
+</code></pre>
+<p>Things to notice in that output:</p>
+<ul>
+<li><strong><code>FD</code> column 0, 1, 2</strong> are stdin / stdout / stderr, all pointing at the same <code>/dev/pts/3</code> — the pseudo-terminal the program was launched in. Exactly the “first three slots are pre-opened by the shell” claim from earlier.</li>
+<li><strong><code>FD</code> column <code>3</code></strong> is our <code>TcpListener</code> — <code>TYPE IPv4</code>, <code>NAME TCP localhost:9000 (LISTEN)</code>. That’s the listening socket living at fd 3, just like every diagram in this chapter has drawn it.</li>
+<li><strong><code>cwd</code> / <code>rtd</code> / <code>txt</code> / <code>mem</code></strong> rows aren’t regular fds — <code>lsof</code> reports them too, but they’re separate kernel references: <code>cwd</code> = current working directory, <code>rtd</code> = root directory, <code>txt</code> = the executable file itself, <code>mem</code> = memory-mapped shared libraries (libc, ld-linux, etc.). They don’t occupy slots in the fd table and you won’t see them under <code>/proc/&lt;pid&gt;/fd</code>.</li>
+</ul>
+<p>Re-run with the <em>child</em> PID and you’ll see an identical <code>fd 3 → TCP localhost:9000 (LISTEN)</code> row — different process, different fd table, same underlying socket.</p>
+<p><strong>Experiment 3: looking at the fd table itself.</strong> Any time you have a running process, the kernel exposes its fd table through <code>/proc/&lt;pid&gt;/fd/</code>. Each entry is a symlink pointing at what that fd refers to:</p>
+<pre><code class="language-bash">$ ls -l /proc/51002/fd
+lrwx------ 1 you you 64 ... 0 -&gt; /dev/pts/2          # stdin
+lrwx------ 1 you you 64 ... 1 -&gt; /dev/pts/2          # stdout
+lrwx------ 1 you you 64 ... 2 -&gt; /dev/pts/2          # stderr
+lrwx------ 1 you you 64 ... 3 -&gt; socket:[2093471]    # our TcpListener
+</code></pre>
+<p>That’s the same table we’ve been drawing as ASCII boxes — but real and live. Higher-level view with <code>lsof</code>:</p>
+<pre><code class="language-bash">lsof -p 51002      # every fd the process holds, with its type and target
+ss -lntp           # all TCP listening sockets on the machine + which pid owns them
+</code></pre>
+<p><strong>Experiment 4: shared heap, private stacks — observed through a race.</strong> Two parts: first <em>prove</em> the heap is shared by racing threads against it; then <em>look</em> at the memory layout directly in <code>/proc</code>.</p>
+<p>The program keeps threads alive with <code>thread::sleep</code> (for the race) and the process alive with a final sleep (so you can inspect <code>/proc</code> after the race finishes):</p>
+<pre class="playground"><code class="language-rust">use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let counter = Arc::new(AtomicU64::new(0));
+
+    let handles: Vec&lt;_&gt; = (0..4).map(|_| {
+        let c = counter.clone();
+        thread::spawn(move || {
+            for _ in 0..1_000_000 {
+                c.fetch_add(1, Ordering::Relaxed);
+            }
+            // Keep the thread alive so its stack is still mapped when we inspect /proc.
+            thread::sleep(Duration::from_secs(600));
+        })
+    }).collect();
+
+    // Wait for the increments to finish (but NOT the sleeps, so threads stay alive).
+    // Give the loops ~200ms — plenty of time on any machine.
+    thread::sleep(Duration::from_millis(200));
+    println!("counter = {}", counter.load(Ordering::Relaxed));
+
+    println!("pid={}  — inspect from another shell, Ctrl-C to exit",
+             std::process::id());
+    for h in handles { h.join().unwrap(); }    // blocks on the 600s sleeps
+}</code></pre>
+<p>The counter prints exactly <code>4000000</code> every time — because <code>AtomicU64</code> synchronizes accesses to that one shared heap cell. Replace <code>AtomicU64</code> with an unsynchronized <code>Cell&lt;u64&gt;</code> (and some <code>unsafe</code>) and you’ll get a smaller, non-deterministic number. That’s proof the heap is genuinely shared: all four threads were writing to the <em>same</em> memory. The per-thread loop variable, meanwhile, lives on each thread’s private stack — four independent copies of that variable existed at once.</p>
+<p><strong>Now peek at the layout.</strong> From a second shell, with <code>PID</code> set to what the program printed:</p>
+<pre><code class="language-bash">PID=&lt;pid from the program&gt;
+
+cat /proc/$PID/maps         # every memory region with address range, perms, label
+pmap -X $PID                # friendlier view with per-region sizes
+cat /proc/$PID/status | grep -E "^(Pid|Tgid|Threads|VmRSS|VmStk|VmData)"
+ls   /proc/$PID/task/       # one directory per thread — should be 5 (main + 4)
+</code></pre>
+<p><strong>Understanding the permissions column.</strong> Before reading the map, decode the 4-character perms string (e.g. <code>rw-p</code>, <code>---p</code>):</p>
+<pre><code class="language-text"> r  w  x  p
+ │  │  │  └── p = private (copy-on-write)   |  s = shared with other processes
+ │  │  └───── x = executable                |  - = not
+ │  └──────── w = writable                  |  - = not
+ └─────────── r = readable                  |  - = not
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Perms</th><th>Meaning</th><th>Typical use</th></tr>
+</thead>
+<tbody>
+<tr><td><code>r-xp</code></td><td>read + execute, private</td><td><strong>Code</strong> (your binary, libc’s <code>printf</code>, …)</td></tr>
+<tr><td><code>r--p</code></td><td>read-only, private</td><td><strong>Constants / rodata</strong> (string literals)</td></tr>
+<tr><td><code>rw-p</code></td><td>read + write, private</td><td><strong>Writable memory</strong> (stack, heap, globals)</td></tr>
+<tr><td><code>---p</code></td><td><strong>no access at all</strong> — SIGSEGV if touched</td><td><strong>Guard page</strong> (see below)</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>---p</code> is the interesting one. <em>Why would you want memory you can’t use?</em> Because it’s a <strong>trap</strong>. The kernel places one at the edge of each thread’s stack so that any overflow — one function call too deep, or a huge local array — immediately faults instead of silently corrupting whatever sits below:</p>
+<pre><code class="language-text">   Worker thread stack (grows DOWN as functions are called):
+
+   high addr   ┌───────────────┐
+               │               │
+               │  rw-p  2 MiB  │   ← stack frames: locals, return addrs
+               │       ↓ grows │
+   low  addr   ├───────────────┤
+               │  ---p   4 KiB │   ← GUARD PAGE — no access
+               └───────────────┘
+                      ↓
+               If the stack grows past its 2 MiB, the next push lands
+               here. CPU refuses → kernel sends SIGSEGV → program dies
+               cleanly instead of corrupting neighbouring memory.
+</code></pre>
+<p>That pattern — a <strong>4 KiB <code>---p</code> guard</strong> immediately followed by a <strong>large <code>rw-p</code> region</strong> — is the fingerprint of a thread stack.</p>
+<p><strong>Real output.</strong> From a Debian Trixie container running the program above as <code>fd_lab</code>, the interesting slice of <code>/proc/$PID/maps</code>:</p>
+<pre><code class="language-text">7fb205c00000-7fb205c01000 ---p 00000000 00:00 0    ← 4 KiB guard
+7fb205e01000-7fb206001000 rw-p 00000000 00:00 0    ← 2 MiB STACK — worker 1
+7fb206000000-7fb206001000 ---p 00000000 00:00 0    ← 4 KiB guard
+7fb206201000-7fb206401000 rw-p 00000000 00:00 0    ← 2 MiB STACK — worker 2
+7fb206400000-7fb206401000 ---p 00000000 00:00 0    ← 4 KiB guard
+7fb206601000-7fb206801000 rw-p 00000000 00:00 0    ← 2 MiB STACK — worker 3
+7fb206800000-7fb206801000 ---p 00000000 00:00 0    ← 4 KiB guard
+7fb206a01000-7fb206c01000 rw-p 00000000 00:00 0    ← 2 MiB STACK — worker 4
+...
+7fb2073c8000-7fb2075af000 ...  /usr/lib/x86_64-linux-gnu/libc.so.6   (5 regions, split by perms)
+7fb2075bc000-7fb2075e9000 ...  /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+7fb2075f2000-7fb2075f8000 r--p/r-xp ...             [vvar] and [vdso]  ← fast syscalls
+7fb2075f8000-7fb20762f000 ...  /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+7fff69940000-7fff69961000 rw-p 00000000 00:00 0    [stack]     ← MAIN thread's stack
+</code></pre>
+<p>Pin it to the theory:</p>
+<ul>
+<li><strong>Four 2 MiB <code>rw-p</code> regions</strong> spaced every 4 MiB — the worker thread stacks. Rust’s default thread stack is 2 MiB; each sits directly above its own <code>---p</code> guard page.</li>
+<li><strong>One <code>[stack]</code></strong> — the main thread’s. The kernel only labels the main one; worker stacks come from pthread’s <code>mmap</code>, so they’re unlabelled.</li>
+<li><strong><code>libc</code>, <code>libgcc_s</code>, <code>ld-linux</code></strong> each appear as 5 regions because an ELF library is mapped segment-by-segment with different permissions (read-only header, <code>r-xp</code> code, <code>r--p</code> rodata, <code>rw-p</code> data).</li>
+<li><strong><code>[vvar]</code> / <code>[vdso]</code></strong> — kernel-exported pages every process gets for free; let <code>gettimeofday()</code> run without a real syscall.</li>
+</ul>
+<p>The <code>[heap]</code> region (where <code>Arc&lt;AtomicU64&gt;</code> lives) doesn’t appear in this slice — it’s at <strong>lower</strong> addresses, right after the binary’s data segment (typically <code>0x5555…</code>). Scroll up in <code>/proc/$PID/maps</code> to find it, or just filter:</p>
+<pre><code class="language-bash">grep -E "\[heap\]|\[stack\]" /proc/$PID/maps
+</code></pre>
+<p><strong>Listing just the worker stacks automatically.</strong> You can extract all ≥ 1 MiB anonymous regions that sit right after a guard page — those are the thread stacks:</p>
+<pre><code class="language-bash">prev_guard=0
+while read -r range perms _; do
+    if [ "$prev_guard" = 1 ] &amp;&amp; [ "$perms" = "rw-p" ]; then
+        start=${range%-*}
+        end=${range#*-}
+        size=$(( 0x$end - 0x$start ))
+        if [ "$size" -ge 1048576 ]; then
+            printf "  stack:  %s  (%d KiB)\n" "$range" $((size / 1024))
+        fi
+    fi
+    [ "$perms" = "---p" ] &amp;&amp; prev_guard=1 || prev_guard=0
+done &lt; /proc/$PID/maps
+</code></pre>
+<p>Pure bash — works under whatever <code>awk</code> Debian ships with. Sample output from the experiment:</p>
+<pre><code class="language-text">  stack:  7fb205e01000-7fb206001000  (2048 KiB)
+  stack:  7fb206201000-7fb206401000  (2048 KiB)
+  stack:  7fb206601000-7fb206801000  (2048 KiB)
+  stack:  7fb206a01000-7fb206c01000  (2048 KiB)
+</code></pre>
+<p>Four stacks, 2048 KiB each — matching the 4 <code>thread::spawn</code> calls exactly. Cross-check with the thread count:</p>
+<pre><code class="language-bash">ls /proc/$PID/task/ | wc -l        # should print 5  (main + 4 workers)
+grep Threads /proc/$PID/status     # Threads:  5
+</code></pre>
+<p>5 threads ↔ 1 labelled <code>[stack]</code> + 4 fingerprint-matching 2 MiB stacks. The correspondence is exact.</p>
+<p><strong>Why can’t I see this <em>after</em> the program exits?</strong> The moment the process ends, the kernel tears down its address space and <code>/proc/&lt;pid&gt;/</code> disappears. You have to inspect <em>while it’s alive</em> — that’s what the final sleep in the Rust code is for.</p>
+<p><strong>What if I want to see the actual bytes in heap or stack?</strong> That needs a debugger, not <code>/proc</code>. <code>gdb -p $PID</code> lets you read raw memory (<code>x/40x &lt;addr&gt;</code>), but for the intuition we’re after — “one heap, many stacks” — the <code>/proc/&lt;pid&gt;/maps</code> view is enough.</p>
+<p><strong>Experiment 5: a listening socket as seen from outside.</strong> A minimal Axum-style listener:</p>
+<pre class="playground"><code class="language-rust">use std::net::TcpListener;
+use std::{thread, time::Duration};
+
+fn main() {
+    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
+    println!("pid={}  listening on 127.0.0.1:8080", std::process::id());
+    thread::sleep(Duration::from_secs(120));
+    drop(listener);
+}</code></pre>
+<p>In a second terminal:</p>
+<pre><code class="language-bash">PID=$(pgrep your_binary)
+ls -l /proc/$PID/fd           # see fd 3 → socket:[...]
+ss -lntp | grep $PID          # see "LISTEN 0 ... 127.0.0.1:8080 ... pid=$PID,fd=3"
+</code></pre>
+<p>Then <code>curl http://127.0.0.1:8080/</code> from a third terminal. Nothing responds (we never call <code>accept</code>), but <code>ss -ntp state syn-recv</code> / <code>ss -ntp '( sport = :8080 )'</code> will show the connection sitting in the SYN queue — exactly the kernel-side queue we’ll describe in the next section.</p>
+<p>Do a few of these once and the rest of this chapter will read very differently: every phrase like “the kernel hands your process an fd” or “the socket is refcounted across processes” now has a command that shows it on your own machine.</p>
+<p>Practical consequences worth keeping in mind through the rest of this chapter:</p>
+<ul>
+<li><strong>A multi-threaded server (Tokio, Go, Java):</strong> all worker threads share one fd table. One <code>TcpListener</code> fd is visible to every thread. The runtime routes accepted connections to whichever thread is free, all operating on fds in the single shared table.</li>
+<li><strong>A pre-fork server (Nginx, classic Apache):</strong> N child processes, each with its own fd table (copied from the parent at <code>fork()</code>), all holding their own fd pointing to the same underlying kernel socket. Works because the <em>socket</em> is refcounted — one process closing its fd doesn’t hurt the others.</li>
+</ul>
+<p><strong>Sharing, copying, inheritance.</strong> Fds have a few lifetime rules worth knowing, because they show up in every pre-fork server and every shell pipeline:</p>
+<ul>
+<li><code>fork()</code> — the child gets a <em>copy</em> of the parent’s fd table. Both processes now have their own fd 3, both pointing to the same underlying socket. This is exactly how pre-fork servers (Apache, gunicorn) let multiple workers share one listening socket.</li>
+<li><code>dup(fd)</code> / <code>dup2(fd, newfd)</code> — make a <em>second</em> fd in your own table that points to the same resource. Shell redirection (<code>&gt;</code>, <code>&lt;</code>) works by duping an open file onto fd 1 or fd 0 before <code>exec</code>ing the command.</li>
+<li><code>close(fd)</code> — frees the slot in <em>your</em> fd table. The underlying resource is only destroyed when the last fd anywhere (any process) referring to it is closed. This is refcounted by the kernel.</li>
+</ul>
+<p><strong><code>fork()</code> vs <code>dup()</code> — both “copy” an fd, so what’s the difference?</strong> It’s a common confusion: both leave you with a new fd pointing at the same underlying resource. The axis that separates them is <em>scope</em>.</p>
+<ul>
+<li>
+<p><code>fork()</code> copies the <strong>whole fd table into a new process.</strong> Two processes afterward, each with its own table, same slot numbers pointing to the same kernel resources:</p>
+<pre><code class="language-text">   Before fork()                 After fork()
+   ─────────────                 ────────────
+   Process A                     Process A          Process B (child)
+     fd 3 ──┐                      fd 3 ──┐           fd 3 ──┐
+            ▼                             ▼                  ▼
+         socket X                       socket X  (same kernel object) ◄┘
+                                        (refcount = 2)
+</code></pre>
+</li>
+<li>
+<p><code>dup(3)</code> copies <strong>one slot inside the same process’s table:</strong></p>
+<pre><code class="language-text">   Before dup(3)                After  new = dup(3)  (returns 4)
+   ─────────────                ──────────────────────────────────
+   Process A                    Process A
+   fd 3 ──► socket X            fd 3 ─┐
+   fd 4 ──► (empty)                   ├──► socket X
+                                fd 4 ─┘
+</code></pre>
+</li>
+</ul>
+<p><code>fork</code> is how you make <strong>more processes</strong> (pre-fork servers, shell pipelines). <code>dup</code> is how you <strong>rearrange entry numbers</strong> in your own fd table, almost always to put a specific resource at fd 0, 1, or 2 before calling <code>exec</code>. That second job — rearranging before <code>exec</code> — is what makes shell redirection work.</p>
+<p><strong>Cost-wise, <code>dup</code> is much cheaper than <code>fork</code>.</strong> If all you want is “two handles to the same socket,” reach for <code>dup</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th><code>dup</code></th><th><code>fork</code></th></tr>
+</thead>
+<tbody>
+<tr><td>New process?</td><td>No — same process</td><td>Yes — brand-new PID</td></tr>
+<tr><td>fd table</td><td>One extra slot added</td><td>Whole table copied</td></tr>
+<tr><td>Memory</td><td>Nothing copied</td><td>New address space (copy-on-write, but still bookkeeping)</td></tr>
+<tr><td>Scheduler</td><td>Untouched</td><td>New task enrolled</td></tr>
+<tr><td>Typical cost</td><td>Nanoseconds</td><td>Microseconds to milliseconds</td></tr>
+</tbody>
+</table>
+</div>
+<p>Both end up bumping the refcount on the shared kernel object (socket, file, pipe), but that’s the <em>only</em> thing <code>fork</code> and <code>dup</code> have in common. Use <code>fork</code> only when you actually need a second <em>process</em> (e.g. a classic Unix server that forks a child per connection). If you just want multiple fds pointing at the same resource inside one process, <code>dup</code> is the right tool.</p>
+<p><strong>Worked example: what <code>./myprog &gt; out.txt</code> actually does.</strong> The goal is to run <code>myprog</code> but send its output to <code>out.txt</code> instead of the terminal. We can’t change <code>myprog</code> — it’s already compiled, and its <code>printf</code> / <code>println!</code> writes to fd 1 (that’s just what those functions do). So the shell’s trick is to rearrange the fd table of its child process <em>before</em> <code>exec</code>ing <code>myprog</code>, so that fd 1 silently points at <code>out.txt</code>. Then <code>myprog</code>’s writes land in the file without <code>myprog</code> knowing anything changed.</p>
+<p><strong>Starting state.</strong> The shell has just <code>fork()</code>ed a child. The child inherited the terminal setup:</p>
+<pre><code class="language-text">   child's fd table
+   ────────────────
+   fd 0 ──► terminal    (stdin)
+   fd 1 ──► terminal    (stdout)   ← this is what we want to redirect
+   fd 2 ──► terminal    (stderr)
+</code></pre>
+<p><strong>Step 1.</strong> <code>f = open("out.txt", ...)</code> — returns <code>3</code>. The file opens at the lowest empty slot:</p>
+<pre><code class="language-text">   fd 0 ──► terminal
+   fd 1 ──► terminal
+   fd 2 ──► terminal
+   fd 3 ──► out.txt     ← new, but useless on its own — myprog writes to fd 1, not fd 3
+</code></pre>
+<p>Opening the file alone doesn’t redirect anything, because <code>myprog</code> doesn’t write to fd 3. We need <code>out.txt</code> on fd 1.</p>
+<p><strong>Step 2.</strong> <code>dup2(f, 1)</code> — read this as <em>“make fd 1 point to the same thing fd 3 points to.”</em> <code>dup2</code> first closes whatever was at fd 1 (the terminal), then makes fd 1 mirror fd 3:</p>
+<pre><code class="language-text">   fd 0 ──► terminal
+   fd 1 ──► out.txt     ← was terminal, now out.txt — this is the swap
+   fd 2 ──► terminal
+   fd 3 ──► out.txt     ← still referenced, so the file stays alive
+</code></pre>
+<p>Fd 1 and fd 3 are now two aliases for the same open file. Safe — the kernel refcounts the file, so it’s alive as long as any fd points to it.</p>
+<p><strong>Step 3.</strong> <code>close(f)</code> — fd 3 isn’t needed anymore. Closing it just empties entry 3; <code>out.txt</code> stays open because fd 1 still references it:</p>
+<pre><code class="language-text">   fd 0 ──► terminal
+   fd 1 ──► out.txt
+   fd 2 ──► terminal
+   fd 3 ──► (empty)
+</code></pre>
+<p><strong>Step 4.</strong> <code>exec("./myprog", ...)</code> — replace the current program with <code>myprog</code>. Only the program’s code and data are replaced; <strong>the fd table survives <code>exec</code> unchanged</strong>. <code>myprog</code> starts running with:</p>
+<pre><code class="language-text">   fd 0 ──► terminal     myprog thinks "this is stdin"
+   fd 1 ──► out.txt      myprog thinks "this is stdout"  ← but it's really the file
+   fd 2 ──► terminal     myprog thinks "this is stderr"
+</code></pre>
+<p>Now when <code>myprog</code> does <code>println!("hello")</code>, that compiles to <code>write(1, "hello\n", 6)</code>. The kernel reads <code>fd_table[1]</code>, finds <code>out.txt</code>, and appends the bytes there. <code>myprog</code> has no idea — it’s just writing to fd 1 like any program does.</p>
+<p><strong>Three kernel design choices make this work:</strong></p>
+<ol>
+<li><strong>fd 1 is a convention, not a hardcoded path.</strong> Programs write to the integer <code>1</code>; what <code>1</code> refers to is whatever’s in the fd table at that entry.</li>
+<li><strong><code>dup2(src, dst)</code> overwrites a specific slot.</strong> Plain <code>dup(fd)</code> picks the lowest empty entry (not useful when you need a <em>specific</em> number). <code>dup2</code> forces <code>dst</code> to mirror <code>src</code>, closing whatever was there first. That’s why <code>dup2</code> exists as a separate syscall — it’s the one that lets you target fd 0, 1, or 2.</li>
+<li><strong><code>exec</code> preserves the fd table.</strong> If <code>exec</code> reset the fds, this trick would be impossible. By design, the fd table survives <code>exec</code> so the parent can pre-configure I/O for the child.</li>
+</ol>
+<p>Shell pipelines (<code>a | b</code>) use the same playbook, twice over: <code>fork</code> to make two children, <code>dup2</code> in each child to wire the pipe’s ends onto fd 1 (for <code>a</code>) and fd 0 (for <code>b</code>) before <code>exec</code>. <code>fork()</code> alone couldn’t do this — <code>fork</code> copies your table as-is, it doesn’t let you rearrange entries. It’s <code>dup2</code> that does the rearranging.</p>
+<p>So: <em><code>fork</code> duplicates the <strong>table</strong> to create a <strong>new process</strong>; <code>dup</code> duplicates <strong>one slot</strong> within the <strong>same process</strong>, usually to position a resource at a specific slot number before <code>exec</code>.</em></p>
+<p><strong>What’s a “pre-fork server”?</strong> A classic server design where the parent process <code>fork()</code>s a pool of worker processes <em>ahead of time</em> (hence “pre-fork”), before any clients connect. All those workers sit in <code>accept()</code> on the same listening socket. When a connection arrives, the kernel hands it to one idle worker; when the worker finishes, it loops back to <code>accept()</code> instead of exiting. Why bother? Three reasons:</p>
+<ul>
+<li><strong><code>fork()</code> is expensive</strong> (see the table above). Forking per-connection would make every request pay that cost. Pre-forking pays it once at startup and reuses the workers forever.</li>
+<li><strong>Isolation</strong> — a crash or memory leak in one worker doesn’t take the others down.</li>
+<li><strong>Simple code</strong> — each worker handles one request at a time with plain blocking calls. No async, no locks.</li>
+</ul>
+<p>Picture it like this:</p>
+<pre><code class="language-text">   Parent               Worker 1            Worker 2            Worker 3            Worker 4
+   (own fd table)       (own fd table)      (own fd table)      (own fd table)      (own fd table)
+   ┌──────────┐         ┌──────────┐        ┌──────────┐        ┌──────────┐        ┌──────────┐
+   │ fd 3 ──┐ │         │ fd 3 ──┐ │        │ fd 3 ──┐ │        │ fd 3 ──┐ │        │ fd 3 ──┐ │
+   └────────┼─┘         └────────┼─┘        └────────┼─┘        └────────┼─┘        └────────┼─┘
+            │                    │                   │                   │                   │
+            └──────────┬─────────┴─────────┬─────────┴─────────┬─────────┴─────────┬─────────┘
+                       ▼                   ▼                   ▼                   ▼
+                              ONE kernel socket  ──►  listening on port 80
+                              (refcount = 5, every worker blocked in accept() on it)
+
+                                                ▲
+                                                │  kernel picks ONE idle worker
+                                                │  and hands it the new connection
+                                                │
+                                           ┌────┴────┐
+                                           │ client  │ ── TCP connect ──► port 80
+                                           └─────────┘
+</code></pre>
+<p>Key idea: every worker has its <strong>own separate fd table</strong> (that’s what <code>fork</code> does), but inside each table <code>fd 3</code> points to the <strong>same single kernel socket</strong>. So all five processes are watching the exact same listening endpoint. When a client connects, the kernel wakes exactly one worker out of <code>accept()</code>, that worker handles the request start-to-finish, then loops back to <code>accept()</code> and joins the pool again.</p>
+<p>Classic examples: Apache’s <code>prefork</code> MPM, older versions of PostgreSQL-style servers, Gunicorn’s default mode for Python. Modern Rust servers (including Axum on Tokio) take a different path: <strong>one process, many async tasks on a thread pool</strong> — same “pay setup once, reuse workers” idea, but the workers are lightweight tasks instead of OS processes, so thousands fit where pre-fork could only afford dozens. How that task pool actually works is the subject of <a href="./01_2_6.async_io.html">Asynchronous I/O</a>.</p>
+<p><strong>Limits.</strong> Fds are finite. Each process has a cap (<code>ulimit -n</code>, commonly 1024 or 4096 by default), and the system has a global cap (<code>/proc/sys/fs/file-max</code>). A server aiming for 10k concurrent connections needs <em>at least</em> 10k fds and usually raises its limit at startup. Hitting the cap means <code>accept()</code> and <code>open()</code> start returning <code>EMFILE</code>.</p>
+<p><strong>In one sentence.</strong> A file descriptor is a small integer your program uses as a handle for something the kernel is managing on your behalf — an index into a per-process table whose entry points to the actual resource (socket, file, pipe, timer). You never see the resource; you only ever see the number.</p>
+<p>With that in hand, every later mention of “fd” just means “a numbered ticket for a kernel-managed thing.”</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="01_2.under_the_hood.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="01_2_2.sockets_and_connections.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="01_2.under_the_hood.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="01_2_2.sockets_and_connections.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

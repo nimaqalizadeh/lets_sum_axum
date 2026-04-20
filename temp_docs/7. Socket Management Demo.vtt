@@ -1,0 +1,2263 @@
+WEBVTT
+
+00:00.020 --> 00:08.360
+This is a demo that I did for my, uh, back end performance course, where I'm building a web server
+
+00:08.360 --> 00:13.580
+completely in C from scratch and showing you the accept calls.
+
+00:13.580 --> 00:16.250
+You're going to see the accept call, the send calls.
+
+00:16.250 --> 00:20.090
+You know, the read all these operations and the system calls.
+
+00:20.090 --> 00:27.230
+So I thought it would be a very nice addition to this section, specifically socket programming as a
+
+00:27.230 --> 00:28.490
+demo of this section.
+
+00:28.910 --> 00:29.870
+I hope you enjoy it.
+
+00:29.870 --> 00:36.500
+All right guys, so how about we set up our testing back end that.
+
+00:37.300 --> 00:46.270
+We will use to simulate slowdowns in the request reading, simulate slowdowns in the connection, acceptance,
+
+00:46.270 --> 00:53.530
+simulate or slowdown in the processing of the request, and simulate slowdowns in the response.
+
+00:53.530 --> 01:01.210
+And the reason we want to do all of this because we I want to show you the difference, um, the different,
+
+01:01.630 --> 01:08.470
+uh, bottlenecks that you can have in your backends, at least from a networking perspective.
+
+01:08.470 --> 01:16.930
+You know, uh, I'm going to use C as a language to build this simple web server, but by all means,
+
+01:16.930 --> 01:20.350
+you don't have to be proficient in C at all.
+
+01:20.350 --> 01:25.240
+You know, this doesn't require you to be a C programmer.
+
+01:25.330 --> 01:30.820
+Uh, I'm going to explain every single line of code that I'm going to write here, of course.
+
+01:30.820 --> 01:35.890
+And you can technically build that same thing even in Node.js or Python.
+
+01:35.890 --> 01:40.420
+I just like C because it shows you it doesn't hide anything.
+
+01:40.420 --> 01:44.020
+It shows you exactly what any web server is doing.
+
+01:44.050 --> 01:51.130
+Technically the NodeJS, the framework, the flasks, the the php's they do exactly the same, but they
+
+01:51.160 --> 01:55.030
+hide it behind a single call, which, uh, I personally don't like.
+
+01:55.030 --> 01:58.270
+You know, I like to see what is going on behind the scenes.
+
+01:58.270 --> 02:06.670
+And, and this is our opportunity to see how a socket is created, how a server is being bound to a
+
+02:06.670 --> 02:12.190
+socket, how listening happens, how connections is being accepted.
+
+02:12.220 --> 02:15.490
+What is it, uh, what is the meaning of a connection?
+
+02:15.490 --> 02:22.000
+Acceptance to begin with, how a socket is being read right, a connection, how to get a connection
+
+02:22.000 --> 02:29.650
+by accepting, uh, a connection from the buffer, and then how to read data from the connection.
+
+02:29.650 --> 02:33.220
+And it's important to say that we're reading just data.
+
+02:33.220 --> 02:45.520
+The concept of the request HTTP request in this case is an application, uh, level, uh definition
+
+02:45.520 --> 02:49.540
+has nothing to do with with the transport protocol.
+
+02:49.540 --> 02:50.500
+And uh.
+
+02:51.500 --> 02:53.150
+I think that I think that's what we're going to do.
+
+02:53.150 --> 02:53.450
+Right?
+
+02:53.450 --> 02:59.330
+So using that server, we're going to use all uh, we're going to use the same server and pretty much
+
+02:59.330 --> 03:05.150
+all the three tiers analysis tier one and T2 and T3, uh T3.
+
+03:05.330 --> 03:11.630
+And we're going to modify the script and the code as we go to, to do different things.
+
+03:11.630 --> 03:14.180
+But this is a very important lecture.
+
+03:14.180 --> 03:14.570
+Right.
+
+03:14.600 --> 03:15.410
+Of course.
+
+03:15.410 --> 03:22.220
+Uh, in the description of this lecture you will see the link to the GitHub where you can download that
+
+03:22.220 --> 03:23.780
+final code.
+
+03:23.780 --> 03:26.450
+Of course, you don't have to write it yourself.
+
+03:27.290 --> 03:27.890
+Let's get started.
+
+03:27.920 --> 03:33.830
+I'll be using Visual Studio Code because this is one of the simplest IDE that is becoming my favorite
+
+03:33.830 --> 03:34.760
+these days.
+
+03:34.760 --> 03:37.340
+So you can download Visual Studio Code.
+
+03:37.640 --> 03:38.690
+You can.
+
+03:38.690 --> 03:42.080
+I think it's available for Mac, Windows and Linux.
+
+03:42.080 --> 03:48.440
+So this course will you can do this course in any language really.
+
+03:48.440 --> 03:51.740
+So in any order using any IDE as well.
+
+03:51.890 --> 03:55.100
+So I went ahead and created a folder.
+
+03:55.100 --> 04:00.710
+What I'm going to do is I'm going to go ahead and create a simple file here.
+
+04:00.710 --> 04:04.280
+And I'm going to call it C Web server dot C.
+
+04:04.970 --> 04:05.390
+Right.
+
+04:05.930 --> 04:15.020
+And what I'm going to do here is I just to do an include include studio dot h.
+
+04:16.850 --> 04:18.440
+Integer main.
+
+04:19.310 --> 04:20.930
+Return zero.
+
+04:21.290 --> 04:25.130
+And let's do a print f hello, world.
+
+04:26.480 --> 04:27.620
+It's just a simple thing.
+
+04:27.620 --> 04:30.620
+Let's make sure that my program is actually running.
+
+04:30.620 --> 04:32.540
+When I debug, it's going to.
+
+04:33.640 --> 04:40.780
+Uh, yell out to me saying, hey, you don't have the C extension, go ahead and install the C plus,
+
+04:40.780 --> 04:42.610
+plus and C extensions.
+
+04:42.610 --> 04:49.480
+This is a very critical for our debugging purposes, so the moment you start will try to run it.
+
+04:49.480 --> 04:59.350
+Or even sometimes I notice that it will show you here in a in a on the side as a as a as a pop up,
+
+04:59.350 --> 05:03.880
+something in the side will pop up and says, hey, uh, you want to install that?
+
+05:03.880 --> 05:05.500
+So just go ahead and install it.
+
+05:05.500 --> 05:11.590
+And by installing it, the beauty here is just you're going to get an option where you say, hey, do
+
+05:11.590 --> 05:13.990
+you want to compile with GCC or clang?
+
+05:14.410 --> 05:17.680
+Uh, it depends like what you have on your machine.
+
+05:17.680 --> 05:18.010
+Right.
+
+05:18.010 --> 05:21.970
+And my Mac, I think I have both like GCC and clang.
+
+05:21.970 --> 05:24.190
+So just go ahead and use GCC.
+
+05:24.370 --> 05:28.630
+And the moment you do that you'll see in the debug console hello world.
+
+05:28.630 --> 05:32.230
+That's not very right.
+
+05:32.890 --> 05:35.320
+It's not very informative, very simple program.
+
+05:35.320 --> 05:41.320
+Now let's actually go ahead and write our web server that is a little slightly a little bit more sophisticated
+
+05:41.320 --> 05:41.740
+than that.
+
+05:41.740 --> 05:45.970
+So for now I'll include the libraries that I'm going to use here.
+
+05:45.970 --> 05:48.070
+I'm going to use the Stdio.
+
+05:48.100 --> 05:57.550
+I'm going to use the Stdlib.h string, I'm going to use the UN std, uh, dot h the socket and the net
+
+05:57.580 --> 05:58.570
+inet dot h.
+
+05:58.570 --> 06:03.730
+And it sees now that, hey, you want the extension that will give us the extension pack, which will
+
+06:03.730 --> 06:06.790
+allow us to debug sockets and stuff like that.
+
+06:06.790 --> 06:08.500
+So go ahead and also install that.
+
+06:08.500 --> 06:09.340
+We're going to need both.
+
+06:09.340 --> 06:12.370
+So the C and the C plus plus extension back.
+
+06:12.370 --> 06:13.990
+So that's something I forgot about.
+
+06:13.990 --> 06:17.590
+So when you include it it will automatically detect it which is awesome right.
+
+06:18.130 --> 06:24.760
+So these are just normal uh libraries that we're going to need here for our socket programming.
+
+06:24.970 --> 06:29.110
+So what we're going to define here is this step.
+
+06:29.110 --> 06:36.970
+We're going to define our, uh, maximum application buffer.
+
+06:37.090 --> 06:42.580
+So this is this will going to be used as an uh input for an array.
+
+06:42.580 --> 06:52.240
+And that will determine the amount of memory in bytes where we're going to place whatever data we receive
+
+06:52.240 --> 06:54.310
+from the network from the neck.
+
+06:54.490 --> 06:55.180
+Right.
+
+06:55.300 --> 07:02.230
+We're going to put it in in a specific area that we're going to reserve in my memory.
+
+07:02.230 --> 07:04.120
+And that's the maximum size here.
+
+07:04.120 --> 07:09.220
+125 so it's like one kilobyte that can technically represent the request size.
+
+07:09.220 --> 07:09.520
+Right?
+
+07:09.520 --> 07:12.310
+So this particular application is very simple.
+
+07:12.310 --> 07:14.530
+It's not for production ready at all.
+
+07:14.530 --> 07:16.000
+And because guess what.
+
+07:16.000 --> 07:19.000
+That's a that's just a one kilobyte request.
+
+07:19.000 --> 07:24.400
+If you have a like a request that is more than one kilobyte, it is going to fail because there is no
+
+07:24.400 --> 07:25.840
+more room to put there.
+
+07:25.840 --> 07:26.170
+Right?
+
+07:26.260 --> 07:28.780
+So that's that's the thing.
+
+07:28.780 --> 07:32.260
+So another thing we're going to do is we're going to define a port.
+
+07:32.410 --> 07:38.620
+If I can't spell define port let's stick with 8080, the classic port.
+
+07:38.620 --> 07:42.610
+This is where we're going to be listening right now our port.
+
+07:43.720 --> 07:47.620
+So let's go ahead and define two variables right.
+
+07:47.800 --> 07:50.980
+The first variable is the server file descriptor.
+
+07:50.980 --> 07:53.260
+And the second one is the client server file descriptor.
+
+07:53.260 --> 07:55.630
+So this what I'm building is the web server.
+
+07:55.630 --> 08:01.300
+So when I listen I'm going to get a file descriptor.
+
+08:01.300 --> 08:07.420
+And that file descriptor will represent my socket information that will it will have information such
+
+08:07.420 --> 08:16.240
+as which port I'm listening to, which addresses I'm bound to, which um, uh, what what family, what
+
+08:16.240 --> 08:17.320
+other family I have?
+
+08:17.320 --> 08:20.470
+Is it IPv4, IPv6, all of this information.
+
+08:20.470 --> 08:22.090
+And that will give me a number.
+
+08:22.090 --> 08:26.020
+And that's, that's the server file descriptors.
+
+08:26.020 --> 08:35.980
+And we're going to use that to spin off, if you will, multiple client file descriptors or this guy,
+
+08:36.010 --> 08:43.450
+this client file descriptor only get created when a connection is established to that socket.
+
+08:43.900 --> 08:44.200
+Right.
+
+08:44.200 --> 08:46.540
+And you're going to get a client file descriptor.
+
+08:46.540 --> 08:49.330
+And a client file descriptor is equal a connection.
+
+08:49.330 --> 08:49.660
+Right.
+
+08:49.660 --> 08:51.100
+That's an actual connection.
+
+08:51.100 --> 08:52.600
+There is one of this.
+
+08:52.600 --> 08:54.280
+And there is many of this.
+
+08:54.280 --> 09:01.270
+In this scenario we're only using 1 to 1 because this this is this C this C web server.
+
+09:01.270 --> 09:04.030
+I'm going to build it such that it's going to be a loop.
+
+09:04.030 --> 09:11.620
+And I'm going to accept a connection, get a client connection, read from that client connection.
+
+09:12.100 --> 09:15.070
+Uh, write to the client connection and close it.
+
+09:15.070 --> 09:16.120
+Very simple.
+
+09:16.120 --> 09:20.230
+So there won't be multiple connections at the same time, right?
+
+09:20.230 --> 09:22.090
+It's just one connection at a time.
+
+09:22.120 --> 09:22.720
+Of course.
+
+09:22.720 --> 09:25.510
+It's a very simple web server.
+
+09:25.510 --> 09:29.830
+So it will allow us to demonstrate all the things that we want to do.
+
+09:29.890 --> 09:32.800
+Um, the next step is like we're going to define the socket address.
+
+09:32.970 --> 09:39.870
+So this is a structure in C that will allow us to define the address for the server.
+
+09:39.870 --> 09:44.100
+So in the address we will be using the what address.
+
+09:44.100 --> 09:45.780
+What is what is the IP address.
+
+09:45.780 --> 09:46.890
+I'm going to listen to.
+
+09:46.890 --> 09:48.360
+What is the port I'm going to listen to.
+
+09:48.360 --> 09:52.470
+There is a bunch of parameters right here that we're going to be defining.
+
+09:52.470 --> 09:55.410
+And the address length is is important.
+
+09:55.410 --> 09:56.370
+That's how C works.
+
+09:56.370 --> 09:59.970
+You have to basically anything you define you have to tell me what's the size.
+
+09:59.970 --> 10:03.480
+Because we don't auto calculate things.
+
+10:03.510 --> 10:09.870
+C lets you do everything by yourself like it's your responsible for doing all of that stuff.
+
+10:10.230 --> 10:10.530
+Right.
+
+10:10.530 --> 10:13.830
+And I'm going to write the comments as I as I go here.
+
+10:13.830 --> 10:15.570
+This is something we explained.
+
+10:15.570 --> 10:18.090
+This is basically now the buffer.
+
+10:18.090 --> 10:18.360
+Right.
+
+10:18.480 --> 10:20.040
+So this was the size.
+
+10:20.070 --> 10:23.550
+Now this is the actual array buffer of characters.
+
+10:23.550 --> 10:25.680
+So we're dealing with characters.
+
+10:25.680 --> 10:27.750
+All of them are null terminated.
+
+10:27.750 --> 10:34.500
+The entire buffer is initialized to zero which is zero is the null character effectively right.
+
+10:34.500 --> 10:39.210
+So all of them are initialized to zero the 1024 of them.
+
+10:39.390 --> 10:41.640
+So now this is my beautiful buffer.
+
+10:41.640 --> 10:47.490
+This is where we're going to copy data right from the operating system.
+
+10:47.490 --> 10:48.600
+Receive kernel.
+
+10:49.110 --> 10:55.410
+And that is per connection for every single connection we get from the client.
+
+10:55.860 --> 11:00.210
+Right when I call, read on that connection, which is the client file descriptor.
+
+11:00.210 --> 11:00.480
+Right.
+
+11:00.480 --> 11:01.290
+This guy.
+
+11:02.120 --> 11:07.730
+We will be copying the data that is received from the client.
+
+11:07.730 --> 11:15.680
+Whatever the size it is, I want only copy max buffer worth of size down to my buffer.
+
+11:15.680 --> 11:20.600
+So we're moving data from the receive buffer, right?
+
+11:21.150 --> 11:26.280
+Which is where the the client sent data to, and we get it in the OS.
+
+11:26.310 --> 11:28.200
+This is now living in the OS.
+
+11:28.200 --> 11:34.410
+The read operation will move the data from that to the buffer, which is to our application.
+
+11:34.410 --> 11:39.810
+So I like to explain this because no, not a lot of people know this, but there's a lot of copying
+
+11:39.810 --> 11:42.900
+going on in programming, in socket programming.
+
+11:42.900 --> 11:49.860
+And this is one of the problems that, uh, engineers still trying to solve it, kernel developers still
+
+11:49.860 --> 11:53.310
+trying to solve this problem through something called zero copy.
+
+11:53.310 --> 11:55.410
+So there is a lot of copying going on here.
+
+11:55.410 --> 11:57.420
+We're gonna we're gonna understand this as we go.
+
+11:57.420 --> 11:59.760
+So time to create the, the socket.
+
+11:59.760 --> 12:02.040
+So let's go ahead and actually create the socket here.
+
+12:03.240 --> 12:07.050
+So when we create the socket we use this class that's called socket.
+
+12:07.050 --> 12:09.420
+And we send it three parameters.
+
+12:09.420 --> 12:13.680
+The first one is like AF stands for address family init.
+
+12:13.680 --> 12:17.940
+Init is the original version which is basically you can call it as.
+
+12:17.940 --> 12:21.420
+You can also call it init four, which is IPV four.
+
+12:21.450 --> 12:24.900
+There is another value called init six which is IPV six.
+
+12:24.900 --> 12:26.820
+Like what do you support essentially.
+
+12:26.820 --> 12:27.240
+Right.
+
+12:27.240 --> 12:30.870
+So here I'm going to only deal with IPV four right.
+
+12:30.870 --> 12:34.140
+So this is a socket only dedicated for IPV four.
+
+12:34.320 --> 12:40.020
+Socket stream is a parameter that tells you that hey I want a streaming protocol.
+
+12:40.020 --> 12:41.700
+This socket is a streaming protocol.
+
+12:41.700 --> 12:42.750
+What does a streaming mean?
+
+12:42.750 --> 12:44.220
+TCP is a streaming.
+
+12:44.220 --> 12:47.490
+As we talked about in my back end engineering and my networking course.
+
+12:47.490 --> 12:47.940
+Right.
+
+12:48.300 --> 12:50.430
+Uh, TCP is a streaming protocol.
+
+12:50.490 --> 12:53.130
+Uh, UDP is a message based protocol.
+
+12:53.340 --> 12:55.620
+So I think that other if you want UDP.
+
+12:55.620 --> 12:58.050
+So Dgram I think yeah, that's how you do it.
+
+12:58.050 --> 13:03.240
+That's, that's if you ask you want to do this, if you want a stream you want this.
+
+13:03.240 --> 13:09.660
+And the third parameter I'm not quite sure, but I think it's just that, hey kernel, select a protocol
+
+13:09.660 --> 13:13.950
+for me because this doesn't technically do TCP.
+
+13:13.980 --> 13:15.900
+It says give me a streaming protocol.
+
+13:15.900 --> 13:19.080
+And this say, hey, just select any streaming protocol.
+
+13:19.080 --> 13:22.050
+So you might have multiple ones.
+
+13:22.050 --> 13:25.830
+Frankly speaking I think that's you always get TCP.
+
+13:25.830 --> 13:31.320
+There is no other streaming TCP protocol that is built in the kernel that I'm aware of.
+
+13:32.280 --> 13:33.300
+Maybe there is.
+
+13:33.300 --> 13:34.860
+But yeah, this is always zero.
+
+13:34.860 --> 13:35.250
+Essentially.
+
+13:35.250 --> 13:36.360
+That's what I'm trying to say.
+
+13:36.360 --> 13:38.910
+If this returns zero, uh, yeah.
+
+13:38.910 --> 13:44.070
+Take this value that will create a new file descriptor.
+
+13:44.250 --> 13:52.050
+If you don't know, uh, Linux and basically windows or any other program deals with file files, treats
+
+13:52.050 --> 13:53.280
+everything as files.
+
+13:53.340 --> 13:56.010
+And a socket is a file, a file is a file.
+
+13:56.130 --> 13:57.180
+Uh, a printer is a file.
+
+13:57.180 --> 13:58.320
+Everything is a file, right?
+
+13:58.320 --> 13:59.580
+There's a file number.
+
+13:59.580 --> 14:04.110
+So when you create this socket again we didn't specify anything which we just told it.
+
+14:04.110 --> 14:05.700
+Hey create me a socket for me.
+
+14:06.330 --> 14:09.810
+And that will give me a server file descriptor.
+
+14:09.810 --> 14:12.900
+If this thing is zero, that means something failed.
+
+14:13.440 --> 14:14.700
+I couldn't create the socket.
+
+14:14.730 --> 14:16.230
+Now why?
+
+14:16.950 --> 14:18.450
+I can't think of an example.
+
+14:18.450 --> 14:20.940
+Why would this fail to be honest, right?
+
+14:20.940 --> 14:22.890
+Because then we're not like listening or anything.
+
+14:22.890 --> 14:26.460
+Maybe not enough memory, right, to create that socket.
+
+14:27.370 --> 14:29.440
+Or maybe there is no network.
+
+14:30.260 --> 14:33.740
+It could be right, but we're not done yet.
+
+14:33.770 --> 14:38.900
+That means if you're if there is an error, just exit right with a with a error code.
+
+14:38.900 --> 14:40.280
+Are you with me so far?
+
+14:40.310 --> 14:43.760
+So now let's go ahead and actually start binding.
+
+14:43.760 --> 14:46.670
+The first thing we're going to do is we're going to bind the socket.
+
+14:46.670 --> 14:50.930
+And the first thing we're going to do is, is literally define the address family.
+
+14:50.930 --> 14:55.730
+You notice that here this address is.
+
+14:56.570 --> 14:58.340
+Is different, right?
+
+14:58.340 --> 15:04.940
+Because this in this case you created a socket, but you didn't really defined, uh, the port and other
+
+15:04.940 --> 15:05.630
+information.
+
+15:05.630 --> 15:10.580
+The address is where you're going to define the IP address and the port.
+
+15:10.580 --> 15:10.850
+Right.
+
+15:10.850 --> 15:14.870
+So of course when you define that you're going to you need to say okay which version is this.
+
+15:14.870 --> 15:17.150
+Or it's an IPV four okay.
+
+15:17.150 --> 15:18.200
+What other things.
+
+15:18.230 --> 15:23.900
+Address dot uh uh this is stands for socket and internet.
+
+15:23.900 --> 15:26.000
+I think that's what it stands for sin okay.
+
+15:26.660 --> 15:28.190
+The family is AF net.
+
+15:28.220 --> 15:35.450
+The address is any address.
+
+15:35.450 --> 15:39.890
+So this tells me like hey listening on 000, that's what I'm doing.
+
+15:39.890 --> 15:41.330
+I'm trying to make it easy here.
+
+15:41.330 --> 15:43.100
+This is usually a bad idea, right?
+
+15:43.100 --> 15:47.690
+I always say that, uh, I forgot the what is.
+
+15:47.690 --> 15:49.640
+I say there's a wrong here.
+
+15:51.330 --> 15:52.290
+Send.
+
+15:54.390 --> 15:55.740
+Edgar forgot that.
+
+15:55.740 --> 15:56.100
+So yeah.
+
+15:56.100 --> 15:57.510
+So we're listening on zero zero.
+
+15:57.510 --> 16:00.150
+Essentially this is listening on all interfaces.
+
+16:00.150 --> 16:06.960
+So if you have a Wi-Fi, if you have a 5G, if you have an Ethernet, that socket will be listening
+
+16:06.960 --> 16:07.980
+on all of them.
+
+16:07.980 --> 16:08.400
+Right.
+
+16:08.400 --> 16:12.540
+And a lot of bad things happen when you do that, usually.
+
+16:12.540 --> 16:12.780
+Right.
+
+16:12.780 --> 16:17.430
+Because you and unintentionally listening on an interface where.
+
+16:18.280 --> 16:18.670
+You.
+
+16:18.670 --> 16:24.490
+Now you're exposing your application to an interface that is not necessarily you want to be exposed
+
+16:24.490 --> 16:25.210
+to, right?
+
+16:25.750 --> 16:27.880
+Like let's say you have a public IP address.
+
+16:27.880 --> 16:33.640
+And if and you have a private IP address and this application is an admin only, so it shouldn't be
+
+16:33.640 --> 16:34.720
+exposed, right.
+
+16:34.750 --> 16:44.080
+We see this all the time with um databases being leaked where people accidentally created a MongoDB
+
+16:44.080 --> 16:55.330
+on on AWS and they listen to all interfaces by default so that the public IP now, uh, accepts connection
+
+16:55.330 --> 17:00.670
+to MongoDB or to Postgres directly from the internet, which is a bad idea, right?
+
+17:00.670 --> 17:06.280
+So that's eventually this will makes our life easier because I don't want to just create now an actual
+
+17:06.280 --> 17:07.990
+IP and show you all that stuff.
+
+17:07.990 --> 17:09.460
+But just listen to this.
+
+17:09.460 --> 17:10.180
+This is an example.
+
+17:10.180 --> 17:12.100
+This is a test anyway, right?
+
+17:12.970 --> 17:14.530
+Uh, the next thing we're going to do is actually the port.
+
+17:14.530 --> 17:19.870
+So address dot, uh, port equal port.
+
+17:19.990 --> 17:21.580
+And this is wrong by the way.
+
+17:21.580 --> 17:21.880
+Right.
+
+17:21.880 --> 17:24.250
+Because port is an integer.
+
+17:25.000 --> 17:33.190
+That is the byte order of the integer is is basically what the host describe anything in the internet
+
+17:33.190 --> 17:38.410
+that has a the bytes, the bits are ordered in something called the network order.
+
+17:38.410 --> 17:41.440
+So anything you send you have to send it in a network order.
+
+17:41.440 --> 17:42.250
+So this is zero.
+
+17:42.250 --> 17:43.360
+So it doesn't matter right.
+
+17:43.510 --> 17:44.890
+This is all the value is all zero.
+
+17:44.890 --> 17:45.790
+So it doesn't matter.
+
+17:45.790 --> 17:46.120
+Right.
+
+17:46.120 --> 17:55.000
+But if you're sending a number or any other value you have to do an h uh h two uh ns right.
+
+17:55.000 --> 18:00.400
+Which is host to network uh order effectively.
+
+18:00.400 --> 18:03.190
+So this will convert this number to that.
+
+18:03.190 --> 18:03.610
+Right.
+
+18:04.060 --> 18:05.740
+And now we're going a little bit of more details.
+
+18:05.740 --> 18:07.570
+But I think it's all relevant right.
+
+18:07.570 --> 18:08.770
+Explaining that stuff.
+
+18:08.770 --> 18:09.130
+Right.
+
+18:09.130 --> 18:09.820
+Details.
+
+18:10.150 --> 18:12.130
+We'll get to the juicy stuff soon.
+
+18:12.700 --> 18:16.480
+And then finally we bind the socket.
+
+18:16.480 --> 18:20.320
+Now we have the server file descriptor that we created here.
+
+18:20.320 --> 18:23.710
+We bind it with this address by sending calling bind.
+
+18:23.740 --> 18:25.330
+We give it the file descriptor.
+
+18:25.330 --> 18:28.120
+We give it the structure a pointer to the address.
+
+18:28.120 --> 18:28.450
+Right.
+
+18:28.450 --> 18:30.370
+The address basically right.
+
+18:30.370 --> 18:31.510
+Because that's a pointer.
+
+18:31.510 --> 18:36.550
+But we give it the address here the address of the address.
+
+18:36.550 --> 18:37.060
+Right.
+
+18:37.060 --> 18:38.380
+And then we give it a size.
+
+18:39.570 --> 18:41.070
+And then we give the size.
+
+18:41.670 --> 18:44.400
+And if this is less than zero, that means the bind failed.
+
+18:44.400 --> 18:48.690
+Usually when the bind fails, that means the the port is already listening.
+
+18:48.690 --> 18:49.080
+Right.
+
+18:49.080 --> 18:57.720
+But you can you can also override that by, uh, providing, uh, a specific flag that will allow you
+
+18:57.720 --> 19:01.770
+to listen to multiple, multiple processes listening on the same port.
+
+19:01.770 --> 19:04.740
+I talked also about that in my back end course in details.
+
+19:05.850 --> 19:06.150
+Right.
+
+19:06.150 --> 19:07.950
+So you can override that if you want.
+
+19:08.970 --> 19:13.620
+And, uh, this, believe it or not, this actually does not listen.
+
+19:13.620 --> 19:18.600
+So if you try to connect, that will fail because technically we're not listening.
+
+19:18.600 --> 19:26.130
+The kernel did not created did not create the necessary data structures to start accepting all the stuff.
+
+19:26.130 --> 19:30.990
+Now, this just created a record that said, okay, this file descriptor now point to the socket, but
+
+19:30.990 --> 19:36.690
+it's not started listening or accepting or uh, actually.
+
+19:37.400 --> 19:41.930
+Uh, responding to send requests right from TCP connections.
+
+19:41.930 --> 19:43.250
+No, it doesn't do anything.
+
+19:43.250 --> 19:47.000
+This is the final step that does that.
+
+19:47.000 --> 19:53.000
+So this will create actually cuz you know, the receive queue, the send queue, the accept queue,
+
+19:53.000 --> 19:54.440
+all of that jazz.
+
+19:54.440 --> 19:55.010
+Right.
+
+19:55.010 --> 19:56.600
+And it will start listening for the client.
+
+19:56.600 --> 19:59.150
+And this I want you to pay attention to the second parameter here.
+
+19:59.150 --> 19:59.390
+Right.
+
+19:59.390 --> 20:03.170
+So when you call listen we give me hey listen start listening.
+
+20:03.170 --> 20:10.310
+And probably and if you are familiar with NodeJS or other languages or frameworks, you will only probably
+
+20:10.430 --> 20:11.300
+need to do this.
+
+20:11.300 --> 20:12.410
+That's it right?
+
+20:12.410 --> 20:16.220
+You probably create an object and then say listen.
+
+20:16.220 --> 20:17.810
+And all the parameters are here.
+
+20:17.810 --> 20:19.190
+So it's easier.
+
+20:19.190 --> 20:25.670
+But it's it's good to understand what all of what is happening here right now.
+
+20:25.670 --> 20:30.770
+If you look at this code and you look at your PHP application or Python, you will basically understand
+
+20:30.770 --> 20:32.330
+you can do a 1 to 1 thing.
+
+20:32.330 --> 20:34.190
+All of this stuff is happening behind the scenes.
+
+20:34.190 --> 20:34.550
+Right?
+
+20:34.550 --> 20:39.080
+So now we're listening and this is this value ten which is my default.
+
+20:39.080 --> 20:47.720
+It's called the backlog or uh, the number of connections, uh, that can sit in the queue.
+
+20:47.720 --> 20:48.500
+Basically.
+
+20:48.500 --> 20:56.390
+You see, when we listen, we create a queue for my socket for the server, and that will have a length
+
+20:56.390 --> 20:57.110
+of ten.
+
+20:57.110 --> 21:03.080
+In this case, when a user tries to connect to your server on port 8080.
+
+21:03.110 --> 21:03.440
+Right.
+
+21:03.440 --> 21:05.240
+Because that's the default port, right.
+
+21:05.240 --> 21:10.460
+What will happen is, uh, the kernel will finish the handshake.
+
+21:10.460 --> 21:13.550
+It will put the syn in something called the send queue.
+
+21:13.580 --> 21:18.620
+I don't want to talk about that right now, but it will respond with a syn ack and the client will do
+
+21:18.620 --> 21:19.310
+an Ack.
+
+21:19.310 --> 21:25.460
+And then that you have a full fledged connection, that connection is placed in the accept queue.
+
+21:25.490 --> 21:28.520
+You'll have a, uh, something like that, right?
+
+21:28.520 --> 21:29.960
+Connection one.
+
+21:34.690 --> 21:36.430
+All the connections here, right?
+
+21:36.580 --> 21:39.250
+So let's say you get a new connection.
+
+21:40.170 --> 21:40.920
+We get?
+
+21:40.920 --> 21:41.430
+Yes.
+
+21:41.430 --> 21:41.820
+Here.
+
+21:41.850 --> 21:42.210
+See?
+
+21:42.240 --> 21:42.840
+Connection.
+
+21:42.840 --> 21:44.280
+This is X means nothing.
+
+21:44.280 --> 21:44.550
+Right.
+
+21:44.550 --> 21:46.350
+So now we have a connection here.
+
+21:46.350 --> 21:46.590
+Right.
+
+21:46.590 --> 21:54.210
+So let's say, uh, the client doesn't call accept, which is what, uh, what what the client does
+
+21:54.210 --> 21:58.920
+here, which is when I say client here, I mean the back end application with the back end application
+
+21:58.920 --> 21:59.340
+calls.
+
+21:59.340 --> 22:06.240
+Accept it will move, remove that from the accept queue and move it to its application.
+
+22:06.240 --> 22:07.710
+And now it's managing it.
+
+22:07.710 --> 22:10.260
+So now it's popped from the disk.
+
+22:10.290 --> 22:13.770
+If the client doesn't call accept this will remain here.
+
+22:13.770 --> 22:17.130
+So now let's say the client doesn't call accept at all right.
+
+22:17.130 --> 22:18.540
+So this will remain here.
+
+22:18.540 --> 22:20.040
+Another client connected.
+
+22:20.040 --> 22:23.940
+So we completed the handshake and we put that other connection here.
+
+22:24.150 --> 22:25.620
+And another client connected.
+
+22:25.620 --> 22:30.150
+Another client connected another and another and another another.
+
+22:30.150 --> 22:32.580
+And we don't accept we never.
+
+22:33.240 --> 22:35.700
+And now we have what, ten is that even ten.
+
+22:35.700 --> 22:40.410
+123456789 ten 1112.
+
+22:40.440 --> 22:41.940
+Yeah, I added two.
+
+22:42.720 --> 22:45.420
+So this is ten right now.
+
+22:45.420 --> 22:48.810
+If another client wants to connect, the kernel will say, wait a minute.
+
+22:48.810 --> 22:51.720
+You're trying to connect to this server right.
+
+22:51.720 --> 22:53.610
+So this server in this case wait a minute.
+
+22:53.610 --> 22:57.060
+You're trying to connect to this socket, the server file descriptor.
+
+22:58.260 --> 23:02.160
+Uh, I'm sorry, but your backup, your accept queue is full.
+
+23:03.360 --> 23:06.480
+I'm not even going to respond to you with a snack.
+
+23:06.480 --> 23:08.430
+I'm not even going to complete the connection.
+
+23:08.430 --> 23:13.800
+So if you ever get an error during connection, right?
+
+23:13.980 --> 23:18.780
+Even it could be that the connection the server is not listening at all, right?
+
+23:18.780 --> 23:24.420
+Or the accept queue is full and the and the back end application is not calling.
+
+23:24.420 --> 23:31.890
+Accept right to move these connections to the to the to the to the client, to the to the memory, to
+
+23:31.890 --> 23:33.060
+the back end application memory.
+
+23:33.060 --> 23:33.360
+Right.
+
+23:33.420 --> 23:34.800
+So let's continue.
+
+23:34.950 --> 23:37.470
+This is where we actually do the actual work.
+
+23:37.470 --> 23:39.540
+Where is this accept happening.
+
+23:39.540 --> 23:41.340
+It's in a loop right.
+
+23:41.340 --> 23:44.280
+Every every socket application has this loop right.
+
+23:45.030 --> 23:46.980
+We loop forever.
+
+23:48.370 --> 23:50.350
+It's an infinite loop, right?
+
+23:50.680 --> 23:52.420
+And this infinite loop.
+
+23:52.420 --> 23:53.620
+Always.
+
+23:54.230 --> 23:58.130
+The first thing it does is calls accept, which is what we talked about.
+
+23:58.280 --> 23:58.700
+Right.
+
+23:58.700 --> 24:04.400
+And this is how uh, so let's add like just a message here saying, hey, okay, waiting for a connection
+
+24:04.400 --> 24:07.220
+just for us so we can know that, hey, we've just printed that.
+
+24:07.220 --> 24:08.270
+We're waiting for a connection.
+
+24:08.270 --> 24:11.600
+So this is just all of this code does.
+
+24:11.600 --> 24:15.830
+Once once we reach here, we start going in the loop.
+
+24:15.950 --> 24:18.500
+The the first thing we do is like, hey, I'm waiting for a connection.
+
+24:18.500 --> 24:19.700
+And next.
+
+24:20.990 --> 24:22.340
+We call except.
+
+24:23.750 --> 24:27.320
+Except is an operation that the backend application call.
+
+24:27.320 --> 24:30.020
+Every backend application calls this, but you never see it.
+
+24:30.020 --> 24:33.140
+You never see it in PHP or Python or Node.js.
+
+24:33.140 --> 24:34.160
+It's hidden from you.
+
+24:34.160 --> 24:38.480
+The back end framework does that for you already.
+
+24:38.480 --> 24:41.420
+There is a loop that always calls, except you never just you.
+
+24:41.420 --> 24:41.750
+Never.
+
+24:41.750 --> 24:43.430
+You just never see it, right?
+
+24:43.430 --> 24:51.620
+That is one main reason I wanted to do this in in a in C, because I want you to see get it.
+
+24:51.620 --> 24:54.950
+I want you to see how the back end application is.
+
+24:54.950 --> 25:00.230
+Actually, this is one of the most important calls to actually accept a connection.
+
+25:01.300 --> 25:06.130
+For that server and create an instance of a connection.
+
+25:06.130 --> 25:06.490
+Right.
+
+25:06.490 --> 25:07.450
+Because that's a socket.
+
+25:07.450 --> 25:08.740
+I like to explain this way.
+
+25:08.740 --> 25:11.020
+Think of this as like a plug, right?
+
+25:11.020 --> 25:12.430
+Like a wall socket.
+
+25:12.430 --> 25:16.810
+And this is a plug that that goes into the wall.
+
+25:16.810 --> 25:17.200
+Right.
+
+25:17.200 --> 25:24.820
+So you can have infinite number of sockets that goes into the same, you know, uh, wall mounted,
+
+25:24.850 --> 25:25.810
+uh, the wall socket.
+
+25:25.810 --> 25:26.290
+Right.
+
+25:26.560 --> 25:29.140
+Probably a bad analogy, but you get my point.
+
+25:29.140 --> 25:29.350
+Right.
+
+25:29.350 --> 25:35.200
+So you can have many connections, but one server file descriptor only in this case.
+
+25:35.200 --> 25:35.500
+Right.
+
+25:36.220 --> 25:37.000
+And that's it.
+
+25:37.000 --> 25:43.780
+When you call accept you provide the server file descriptor which is my socket and the address information.
+
+25:43.780 --> 25:47.650
+And that returns a client file descriptor which is my connection.
+
+25:47.650 --> 25:47.980
+Right.
+
+25:47.980 --> 25:51.940
+So client IFD in this case is the connection.
+
+25:52.060 --> 25:52.600
+Right.
+
+25:52.600 --> 25:55.210
+You can technically add this into an array.
+
+25:55.210 --> 25:57.280
+And you can have an array of connections.
+
+25:57.280 --> 26:01.660
+And you can call read on all these connections right.
+
+26:01.660 --> 26:02.170
+Get it.
+
+26:02.170 --> 26:06.610
+So we have our server socket the server socket we call accept on it.
+
+26:06.610 --> 26:11.200
+And when there is a connection we get back an actual connection.
+
+26:11.200 --> 26:16.210
+This call will actually block the application right.
+
+26:16.360 --> 26:18.790
+Unless you do Epoll and IO.
+
+26:18.820 --> 26:23.170
+You rang, which is not our topic today, but these usually just blocks.
+
+26:23.380 --> 26:27.460
+The application just gets stuck here, gets stuck.
+
+26:28.330 --> 26:31.540
+Unless there is actually something in the queue.
+
+26:31.540 --> 26:32.980
+If the queue.
+
+26:32.980 --> 26:34.180
+If the queue.
+
+26:34.180 --> 26:39.700
+If the accept queue is empty, we are stuck here.
+
+26:40.090 --> 26:41.620
+The code is just stuck here.
+
+26:41.620 --> 26:43.480
+We know we never move, right?
+
+26:43.990 --> 26:49.630
+But if there is at least one entry, we pop it from the accept queue from the operating system, accept
+
+26:49.630 --> 26:50.680
+queue and move it.
+
+26:50.680 --> 26:54.850
+That file descriptor is created at that point and we get that beautiful thing.
+
+26:54.880 --> 26:57.850
+Other otherwise, in case of an error right.
+
+26:57.850 --> 27:00.280
+We get an accept failure and we just fail, right.
+
+27:00.580 --> 27:01.630
+So sweet.
+
+27:01.750 --> 27:04.930
+Next step after we have a connection, what do we do with the connection?
+
+27:04.930 --> 27:08.110
+The most important thing is actually call a read on that connection.
+
+27:08.110 --> 27:10.360
+Like let's read what's in you.
+
+27:10.360 --> 27:11.050
+Right?
+
+27:12.510 --> 27:15.810
+And that is one of the most important things here.
+
+27:15.960 --> 27:16.260
+Okay.
+
+27:16.830 --> 27:22.140
+So Reed, you give it the client file descriptor which is the connection.
+
+27:22.140 --> 27:23.760
+And you want to read.
+
+27:24.420 --> 27:26.040
+Into this buffer.
+
+27:26.040 --> 27:27.240
+What is the what is this buffer?
+
+27:27.240 --> 27:29.820
+Remember, we created this a long time ago.
+
+27:30.720 --> 27:31.140
+Uh huh.
+
+27:31.560 --> 27:34.050
+And then I want to read only this much.
+
+27:34.050 --> 27:35.820
+You don't want to read more?
+
+27:35.820 --> 27:36.630
+I also write.
+
+27:36.630 --> 27:37.980
+Don't bite more than you chew.
+
+27:37.980 --> 27:38.880
+That's the buffer.
+
+27:38.880 --> 27:39.150
+You.
+
+27:39.150 --> 27:42.180
+If you read more, then you're going to exceed your buffer, of course.
+
+27:42.180 --> 27:42.540
+Right.
+
+27:43.080 --> 27:53.310
+And Jose can it can can it can it be the case where, uh, uh, we have more data in the receive buffer?
+
+27:54.460 --> 27:56.860
+Uh, and we only read half of it.
+
+27:56.860 --> 27:57.070
+Yeah.
+
+27:57.070 --> 27:59.410
+Of course, that's why you have to call read multiple times.
+
+27:59.860 --> 28:05.260
+Again, this is a this is a very simple example that assumes a lot of things, you know, and that's
+
+28:05.260 --> 28:09.880
+that's why a sophisticated web server takes care of all these edge cases for you.
+
+28:09.880 --> 28:17.650
+Um, Node.js or Python, flask, PHP, all they take care of all this nitty gritty details.
+
+28:17.650 --> 28:17.950
+Right.
+
+28:18.700 --> 28:24.700
+And what I forgot to mention is also so we talked about there is a receive.
+
+28:24.730 --> 28:25.840
+There is an accept queue.
+
+28:25.840 --> 28:30.550
+An accept queue is is one queue per server socket.
+
+28:30.550 --> 28:35.650
+So when you create a socket you get one accept queue where the connections will live there.
+
+28:35.770 --> 28:46.540
+But for the connection you actually get two different queues with your client file descriptor.
+
+28:46.540 --> 28:52.450
+And those receive those are called the receive queue and the send queue.
+
+28:52.480 --> 28:58.840
+Those two queues live in the operating system kernel as well.
+
+28:59.050 --> 29:01.330
+And for that connection.
+
+29:01.330 --> 29:04.480
+So for each connection you get two right.
+
+29:04.720 --> 29:08.860
+The receive queue is where data for that connection goes to.
+
+29:09.370 --> 29:09.580
+Right.
+
+29:09.580 --> 29:10.990
+You're actually sending the request.
+
+29:10.990 --> 29:17.560
+You go to that queue and the send queue is if you want to send stuff from the server back to the client,
+
+29:17.560 --> 29:19.420
+it first goes into the send queue.
+
+29:19.420 --> 29:23.590
+And then from the send queue it goes to the neck which is the network interface controller.
+
+29:23.590 --> 29:29.500
+And from the network interface controller it goes to the actual application in the client side, you
+
+29:29.500 --> 29:29.740
+know.
+
+29:29.740 --> 29:32.230
+So there is a lot of copying again here.
+
+29:32.230 --> 29:33.610
+So there is a copy.
+
+29:33.610 --> 29:37.000
+So I have, I have data uh, and I'm now reading.
+
+29:37.000 --> 29:37.240
+Right.
+
+29:37.240 --> 29:42.820
+So the reading is coming from the receive queue to the uh.
+
+29:43.780 --> 29:44.950
+To my application.
+
+29:44.950 --> 29:50.770
+So there's one copy going on, but there's also another copy that happening from the network interface
+
+29:50.770 --> 29:54.760
+controller when the data arrived to the receive queue.
+
+29:54.790 --> 29:55.000
+Right.
+
+29:55.000 --> 29:57.640
+So there is technically three copies.
+
+29:58.540 --> 29:59.380
+Happening.
+
+29:59.380 --> 29:59.590
+Right?
+
+30:00.070 --> 30:01.390
+All right, so we printed.
+
+30:01.390 --> 30:01.870
+But.
+
+30:02.580 --> 30:04.890
+We don't even need to check what's in the request.
+
+30:04.890 --> 30:05.670
+We just trust it.
+
+30:05.670 --> 30:08.880
+So technically, what we need to check here is like, oh, is it a git request?
+
+30:08.880 --> 30:09.750
+Is it a post?
+
+30:09.750 --> 30:10.200
+Is it?
+
+30:10.200 --> 30:11.880
+I'm not going to do any of that stuff.
+
+30:11.880 --> 30:16.230
+I'm just going to respond with 200 requests here.
+
+30:16.320 --> 30:16.680
+Right.
+
+30:16.680 --> 30:17.940
+How do we respond?
+
+30:18.930 --> 30:19.710
+Here is the.
+
+30:20.830 --> 30:22.090
+Is the variable here?
+
+30:22.960 --> 30:25.210
+We sent the request by writing the socket.
+
+30:25.210 --> 30:26.230
+How do we send it?
+
+30:26.440 --> 30:33.340
+HTTP 1.1 I'm using simple things to be on one 200 okay Content-Type text plain Content-length.
+
+30:33.370 --> 30:39.580
+This is powerful because I'm going to play with that in in the in the coming lectures.
+
+30:39.580 --> 30:41.290
+I'm going to play with these numbers.
+
+30:41.650 --> 30:42.190
+Right.
+
+30:42.460 --> 30:45.580
+Uh, I'm going to manipulate these numbers.
+
+30:45.580 --> 30:48.700
+So this is actually exactly 13 characters.
+
+30:48.700 --> 30:49.720
+That's why I wrote here.
+
+30:49.720 --> 30:50.350
+13.
+
+30:50.590 --> 30:56.080
+But this there is a big thing here that we're going to explain in a minute.
+
+30:56.080 --> 30:58.030
+So now this is a string right.
+
+30:58.030 --> 31:02.170
+There's an array pointer that a character pointer.
+
+31:02.500 --> 31:02.800
+Right.
+
+31:03.880 --> 31:05.800
+Here's the the operation.
+
+31:05.800 --> 31:12.520
+For right now we are writing to the socket which means remember this.
+
+31:12.520 --> 31:13.570
+This is a variable right.
+
+31:13.570 --> 31:17.980
+So it's a it's defined in my process.
+
+31:19.180 --> 31:20.260
+Uh where is this living.
+
+31:20.260 --> 31:20.950
+It's a function.
+
+31:20.950 --> 31:23.860
+So it's living in my stack in my main function.
+
+31:23.860 --> 31:24.460
+Right.
+
+31:24.610 --> 31:28.330
+Because it's a local variable I think in the heap is only malloc stuff.
+
+31:28.330 --> 31:29.230
+Yeah I'm pretty sure.
+
+31:29.230 --> 31:29.470
+Yeah.
+
+31:29.470 --> 31:32.980
+This is in the stack because the, my function the main is a function.
+
+31:32.980 --> 31:34.870
+And this is just a variable.
+
+31:34.870 --> 31:37.840
+It's technically a pointer variable to a string.
+
+31:37.840 --> 31:42.730
+And then, and then uh that lives in, in my memory.
+
+31:42.730 --> 31:43.570
+Right.
+
+31:43.570 --> 31:46.030
+Right in my application memory.
+
+31:46.030 --> 31:55.930
+So what we're doing here is we're copying that response down to the client file descriptor, uh, send
+
+31:55.930 --> 31:57.910
+queue OS.
+
+31:57.940 --> 32:02.290
+We're writing it to the send queue for my connection.
+
+32:02.290 --> 32:07.090
+And then the kernel will decide, okay, let's let's wait, let's wait, let's wait, let's wait for
+
+32:07.090 --> 32:07.990
+more data.
+
+32:07.990 --> 32:11.680
+And then it will just ship all of them to the neck, right.
+
+32:11.680 --> 32:14.620
+And from the neck they will go to the application.
+
+32:14.620 --> 32:15.460
+Make sense?
+
+32:15.730 --> 32:15.910
+All right.
+
+32:15.910 --> 32:18.970
+So there is like a lot of copying again going on here.
+
+32:24.620 --> 32:25.820
+And then finally.
+
+32:26.610 --> 32:31.380
+Before we end the loop, we close the connection again.
+
+32:31.380 --> 32:32.970
+Very bad example here.
+
+32:32.970 --> 32:34.710
+Never good for prediction.
+
+32:34.710 --> 32:38.070
+I'm reading, responding and closing the connection.
+
+32:38.070 --> 32:40.230
+Most of the HTTP connection are alive.
+
+32:40.260 --> 32:45.240
+You never close it because you probably if you open a connection, you want to send a lot of data.
+
+32:45.240 --> 32:49.770
+You can't just open a request and close it immediately after it's in the response.
+
+32:49.770 --> 32:49.980
+Right?
+
+32:49.980 --> 32:52.020
+That's just doesn't make any sense.
+
+32:52.020 --> 32:54.060
+And I think we're done.
+
+32:54.390 --> 32:55.740
+This is it, right?
+
+32:55.740 --> 32:58.800
+How about we actually test our beautiful program here.
+
+32:58.920 --> 32:59.970
+Let's go ahead and run.
+
+33:01.690 --> 33:03.100
+It's listening.
+
+33:03.130 --> 33:05.140
+I put actually a break point here.
+
+33:05.140 --> 33:05.680
+That's nice.
+
+33:05.710 --> 33:06.700
+It actually works.
+
+33:07.000 --> 33:09.520
+And you can see that it's it's blocked here.
+
+33:09.520 --> 33:13.090
+Except because I technically don't have any connections here.
+
+33:13.150 --> 33:13.570
+Right.
+
+33:14.170 --> 33:15.730
+So I can actually.
+
+33:16.860 --> 33:18.630
+Let's do a let's go ahead and do that.
+
+33:19.430 --> 33:22.820
+What are it does it does not like that, does it?
+
+33:22.820 --> 33:23.480
+All right.
+
+33:23.660 --> 33:26.780
+It might does not like me breaking this again.
+
+33:26.780 --> 33:30.140
+Uh, let's go to let's open a safari.
+
+33:30.140 --> 33:30.740
+Maybe.
+
+33:30.740 --> 33:31.130
+Okay.
+
+33:31.130 --> 33:36.050
+Let's go into Safari and type in http localhost 8080 and hit enter.
+
+33:37.750 --> 33:39.790
+Notice that we are now unblock.
+
+33:39.790 --> 33:41.530
+We were blocked here, remember?
+
+33:41.530 --> 33:49.180
+Now we moved here and we got a client file descriptor for because file descriptor is our integer.
+
+33:49.180 --> 33:51.220
+So we have the client file descriptor.
+
+33:51.220 --> 33:53.020
+Let's go ahead and step in.
+
+33:53.020 --> 33:55.510
+Now we have a data in the buffer.
+
+33:55.510 --> 34:04.180
+And if you see closely get slash HTTP one one localhost all of that stuff.
+
+34:04.180 --> 34:05.350
+That's what Safari is.
+
+34:05.350 --> 34:06.460
+And effectively right.
+
+34:06.610 --> 34:07.960
+Let's go ahead and just print it.
+
+34:08.410 --> 34:08.800
+All right.
+
+34:09.490 --> 34:13.210
+And we're gonna go ahead and response so we can see we have a response.
+
+34:13.210 --> 34:15.250
+Hello world right.
+
+34:16.090 --> 34:17.320
+Nice.
+
+34:18.230 --> 34:19.220
+And that's it.
+
+34:19.370 --> 34:25.430
+So now we can play the game of breaking point here.
+
+34:25.430 --> 34:27.860
+Slowing down right here.
+
+34:27.860 --> 34:33.920
+We can play a game where we're only like we're going to say like, hey, I have 20 bites, but we only
+
+34:33.920 --> 34:36.860
+said, uh, 19 bites.
+
+34:36.860 --> 34:43.670
+And then if we do that, then the technically the client side keeps waiting for more data because you
+
+34:43.820 --> 34:47.180
+the headers are first received and we'll say, oh, you only.
+
+34:47.180 --> 34:51.170
+So you said I'm going to send you say send me 20 bytes, but you only send me 19.
+
+34:51.170 --> 34:55.310
+All these things we're going to play with all of that stuff.
+
+34:55.370 --> 34:59.390
+All right guys, so this is basically.
+
+35:00.110 --> 35:05.420
+The code that we're going to use, I'm going to push it in a git GitHub repo.
+
+35:05.450 --> 35:06.920
+It's going to be available.
+
+35:06.920 --> 35:07.220
+You know what?
+
+35:07.220 --> 35:08.600
+Let's let's just do it right now.
+
+35:09.680 --> 35:13.070
+All right guys, so I just created this simple repo.
+
+35:13.070 --> 35:17.210
+Right now is going to be available in the description of this lecture.
+
+35:17.210 --> 35:19.310
+So you don't have to rewrite the whole thing.
+
+35:19.310 --> 35:20.600
+Just clone this repo.
+
+35:20.600 --> 35:21.740
+You should have that.
+
+35:21.740 --> 35:24.200
+And if you ever by the way, I didn't show you that.
+
+35:24.200 --> 35:31.940
+If you ever want to do that outside of debug, you can technically, uh, compile your program, right?
+
+35:31.940 --> 35:33.740
+Our program can be also compiled.
+
+35:33.740 --> 35:39.080
+You can use gcc c web server dot C and then just hit enter.
+
+35:39.080 --> 35:39.530
+Right.
+
+35:39.530 --> 35:42.890
+That will create a dot out file.
+
+35:42.890 --> 35:44.720
+And you can just do a dot out.
+
+35:44.720 --> 35:48.560
+And that is effectively without debugging right.
+
+35:48.560 --> 35:49.940
+You can just run the program.
+
+35:49.940 --> 35:53.450
+So let's go ahead and then do maybe another.
+
+35:54.730 --> 35:56.860
+So open another terminal.
+
+35:56.860 --> 35:59.410
+Yeah, let's just do another terminal here.
+
+36:00.070 --> 36:06.340
+Let's do curl localhost 8080 and we get hello world.
+
+36:06.340 --> 36:09.850
+Nice by the way because we listen to all interfaces.
+
+36:09.850 --> 36:12.310
+You can see that this also work.
+
+36:12.790 --> 36:17.170
+Uh my IP address is 4323, if I'm not mistaken.
+
+36:17.170 --> 36:18.490
+Unless this changed.
+
+36:19.370 --> 36:21.020
+So this works too, right?
+
+36:21.890 --> 36:24.710
+Uh, this works too.
+
+36:27.090 --> 36:27.990
+Does that work?
+
+36:28.020 --> 36:29.190
+Thought this should work.
+
+36:29.220 --> 36:34.380
+Oh, this doesn't work because this is the IPv6 when we only listen to IPv4.
+
+36:34.410 --> 36:35.940
+Okay, that's what I meant.
+
+36:36.450 --> 36:37.470
+That makes sense, right?
+
+36:37.500 --> 36:39.480
+Because we're not listening to IPv6.
+
+36:39.480 --> 36:41.190
+We're listening only to IPv4.
+
+36:41.190 --> 36:45.210
+So only that or this should work, right?
+
+36:45.690 --> 36:48.480
+127001 should work.
+
+36:49.410 --> 36:50.220
+All right guys.
+
+36:50.220 --> 36:54.060
+So that is it for me for this lecture.
+
+36:56.100 --> 36:56.760
+As a summary.
+
+36:56.760 --> 36:57.780
+What we did, we learn.
+
+36:57.780 --> 37:04.080
+We learned how to basically build a web server from scratch using C, and we explain every single thing
+
+37:04.080 --> 37:04.740
+that happens.
+
+37:04.740 --> 37:06.540
+What does the server do?
+
+37:06.660 --> 37:10.530
+It creates an IPv4 address family.
+
+37:10.770 --> 37:16.560
+It will listen on port 8080 only for IPv4 on all interfaces.
+
+37:16.560 --> 37:24.810
+Not a good idea in production unless you know what you're doing and when a connection is is received.
+
+37:24.810 --> 37:28.680
+When a connection is completed in the kernel, it will be placed in the accept queue.
+
+37:28.710 --> 37:35.340
+This back end app that we wrote will call accept, which will move the connection from the kernel to
+
+37:35.340 --> 37:38.520
+my application as a client file descriptor.
+
+37:38.520 --> 37:40.590
+And then we take that number right.
+
+37:40.590 --> 37:44.130
+And when we call read on, it says, hey, do you have any data?
+
+37:44.130 --> 37:48.390
+You have any data that read also could block, which I don't think we talked about that.
+
+37:48.390 --> 37:54.690
+But if you don't have anyone, if nobody sent you any data yet, they connected to you but didn't send
+
+37:54.690 --> 37:55.110
+anything.
+
+37:55.110 --> 37:56.580
+This read will also block.
+
+37:56.580 --> 37:59.070
+We'll just be stuck there, right?
+
+37:59.070 --> 38:00.600
+So, um.
+
+38:01.950 --> 38:06.960
+Unless you have data that will be read, and then we'll be unblocked and we'll give it to you.
+
+38:06.960 --> 38:07.560
+Right?
+
+38:07.650 --> 38:11.940
+That's why asynchronous programming is really critical here with socket programming.
+
+38:11.940 --> 38:15.300
+Whatever you we do here is all blocking, right.
+
+38:15.300 --> 38:22.470
+And maybe it's great for explaining purposes because we it's a very simple to read and we get to do
+
+38:22.500 --> 38:23.340
+tricks to it.
+
+38:23.340 --> 38:26.520
+We want to block the application so we know what it's doing.
+
+38:26.760 --> 38:28.770
+But it's not good for production of course.
+
+38:28.770 --> 38:29.190
+Right.
+
+38:29.190 --> 38:31.500
+That's why asynchronous is a way to go.
+
+38:31.680 --> 38:35.760
+We have read we read the data, we manipulate it, we check it.
+
+38:35.760 --> 38:36.870
+We do an if statement.
+
+38:36.870 --> 38:39.240
+If your get do this if your post do that.
+
+38:39.240 --> 38:43.170
+If you go query a database, do all this stuff, fancy stuff.
+
+38:43.260 --> 38:47.580
+And then now we're ready to actually build out the response to respond to the server.
+
+38:47.580 --> 38:50.340
+And we can delay as much as we want here.
+
+38:50.340 --> 38:54.930
+We can do a sleep to, uh, kind of actually simulate a delay.
+
+38:54.930 --> 38:58.200
+We'll do all of that in the, in the, in the upcoming lectures.
+
+38:58.200 --> 38:58.440
+Right.
+
+38:58.440 --> 39:01.110
+And then once we have the data, we write it to the socket.
+
+39:01.110 --> 39:04.440
+So now we're moving the data from my memory, from my stack.
+
+39:04.680 --> 39:05.160
+Uh, right.
+
+39:05.160 --> 39:10.740
+To be specific, if you have like you could have malloc this application data and it could be in the
+
+39:10.740 --> 39:11.100
+heap.
+
+39:11.100 --> 39:11.340
+Right.
+
+39:11.340 --> 39:17.070
+So you move it from the heap down to the send buffer for the operating system.
+
+39:17.070 --> 39:21.240
+And then from the send buffer the kernel we're our job is done.
+
+39:21.240 --> 39:24.990
+The kernel is just uh can decide to delay.
+
+39:24.990 --> 39:25.230
+Right.
+
+39:25.230 --> 39:30.270
+And that's one other set of configurations that you can do this the kernel sometimes you say, hey,
+
+39:30.270 --> 39:31.350
+I just sent the data.
+
+39:31.350 --> 39:33.300
+Why is the client not receiving it?
+
+39:33.450 --> 39:39.300
+It's just the kernel deciding to wait a little bit to receive more data from you and then ship it all
+
+39:39.300 --> 39:39.810
+together.
+
+39:39.810 --> 39:40.230
+Right.
+
+39:40.230 --> 39:45.660
+So this slight delays, I'm talking like microseconds or sometimes a few milliseconds.
+
+39:45.660 --> 39:46.530
+Not much.
+
+39:46.530 --> 39:46.800
+Right.
+
+39:46.980 --> 39:49.170
+But all up to the kernel at the end of the day.
+
+39:49.170 --> 39:51.270
+And then we basically close the connection.
+
+39:51.270 --> 39:52.620
+That's what the application does.
+
+39:52.620 --> 40:02.280
+We'll do all sorts of trick to manipulate this so we can, uh, demonstrate a slow application in all
+
+40:02.280 --> 40:04.200
+its on its facets.
+
+40:04.290 --> 40:06.630
+I hope you're going to enjoy the coming lectures.
+
+40:06.630 --> 40:11.010
+Sorry if that lecture is long, but I thought it's critical to explain all that stuff.
+
+40:11.010 --> 40:11.580
+All right.
+
+40:12.180 --> 40:12.840
+See you in the next one.
