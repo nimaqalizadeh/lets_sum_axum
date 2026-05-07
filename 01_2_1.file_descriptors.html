@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d035bc48.js";
+            window.path_to_searchindex_js = "searchindex-a194e805.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-51710b19.js"></script>
@@ -184,6 +184,17 @@
 <li><strong>Security.</strong> If syscalls took kernel pointers from userspace, any process could forge one and read or corrupt kernel memory. A number is safe — the kernel validates it against <em>your</em> private list on every call.</li>
 <li><strong>Uniformity.</strong> If every I/O thing gets a number, then one set of verbs (<code>read</code>, <code>write</code>, <code>close</code>) works on <em>all</em> of them, and the kernel dispatches to the right implementation based on what the number points to. That’s the whole meaning of “everything is a file.”</li>
 </ul>
+<p><strong>Aside: fds aren’t only for I/O.</strong> “I/O” is the most common use, but the fd interface is reused for any kernel object that benefits from the same verbs (<code>read</code>, <code>close</code>, <code>poll</code>/<code>epoll</code>). On Linux you’ll find fds for things that have nothing to do with bytes flowing in or out:</p>
+<ul>
+<li><strong>Timers</strong> — <code>timerfd_create()</code> returns an fd that becomes “readable” when the timer fires; <code>eventfd()</code> is a counter you can wait on.</li>
+<li><strong>Signals</strong> — <code>signalfd()</code> turns signals into something you can <code>read()</code> instead of handling asynchronously in a handler.</li>
+<li><strong>Process handles</strong> — <code>pidfd_open()</code> gives you an fd referring to a process; you can wait on it or send signals through it without races.</li>
+<li><strong>Event notification itself</strong> — <code>epoll_create()</code> (Linux) and <code>kqueue</code> (BSD/macOS) hand you an fd for the <em>waiting mechanism</em>, so you can even nest one epoll inside another.</li>
+<li><strong>Memory</strong> — <code>memfd_create()</code> for anonymous memory regions, <code>userfaultfd()</code> for handling page faults in userspace.</li>
+<li><strong>Filesystem watching</strong> — <code>inotify_init()</code> / <code>fanotify_init()</code> produce fds that emit events when files change.</li>
+<li><strong>Namespaces, cgroups, BPF programs</strong> — all referenced by fd in modern Linux.</li>
+</ul>
+<p>The pattern is always the same: the kernel owns some object, hands you an integer, and you operate on it with the usual fd verbs. That’s the payoff of “everything is a file” — once a thing has an fd, every tool that already understands fds (<code>epoll</code>, <code>select</code>, <code>close</code>, <code>dup</code>, <code>/proc/&lt;pid&gt;/fd</code>) works on it for free.</p>
 <p><strong>What the number indexes.</strong> Every running process has a small private list the kernel maintains for it — the <strong>file descriptor table</strong>. Entry 0, entry 1, entry 2, entry 3, … Each entry is either empty or points to an open resource.</p>
 <p>One thing to be precise about upfront: <strong>the fd <em>is</em> the index into this table.</strong> When we say “fd 3” and “entry 3,” that’s the <em>same</em> integer, not two numbers with a translation between them. <code>socket()</code> returns an integer — say <code>3</code> — and that very integer is both “your file descriptor” and “the position in your fd table where the kernel stored the pointer to the socket.” There’s no <code>fd → slot</code> lookup step; the fd and the slot number are the same number.</p>
 <pre><code class="language-text">   Your process's fd table            What each slot points to
@@ -196,7 +207,7 @@
    5  ─────────────────────────►      (empty)
    ...
 </code></pre>
-<p>The first three are pre-opened for you when the shell launches your program (stdin, stdout, stderr). Slots 3 and up are assigned lowest-empty-first as you open things. When you <code>close(3)</code>, slot 3 empties and the next <code>open()</code> or <code>socket()</code> gets reused there.</p>
+<p>The first three are pre-opened for you when the <strong>shell</strong> launches your program (stdin, stdout, stderr). Slots 3 and up are assigned lowest-empty-first as you open things. When you <code>close(3)</code>, slot 3 empties and the next <code>open()</code> or <code>socket()</code> gets reused there.</p>
 <p><strong>The whole flow.</strong> You call <code>socket()</code> — the kernel allocates a socket struct (the thing we describe in the next section), stores a pointer to it at entry <code>3</code> of your fd table, and returns the integer <code>3</code> to you. From then on, every syscall you pass <code>3</code> to reads <em>that same entry</em>:</p>
 <ul>
 <li><code>read(3, buf, n)</code> → kernel reads <code>fd_table[3]</code> → finds the socket → drains bytes from its receive buffer into <code>buf</code>.</li>
@@ -251,24 +262,26 @@
 <p>So: <strong>a thread is an execution context (stack + registers) running inside a process</strong>, not a miniature process of its own. A process always starts with exactly one thread (the “main thread”); spawning more threads multiplies the <em>runners</em> without multiplying the <em>environment</em>.</p>
 <p>Here’s how memory and kernel state split between threads of one process:</p>
 <pre><code class="language-text">   Process P (one address space)
-   ┌──────────────────────────────────────────────────────────┐
-   │  CODE / TEXT         ◄── shared by all threads           │
-   │  (compiled instructions, read-only)                      │
-   ├──────────────────────────────────────────────────────────┤
-   │  DATA / BSS          ◄── shared (globals, statics)       │
-   ├──────────────────────────────────────────────────────────┤
-   │  HEAP                ◄── shared (Box, Vec, String, ...)  │
-   │                          THIS is why Rust has Arc,       │
-   │   ... grows up ...       Mutex, RwLock                   │
-   │                                                          │
-   ├──────────────────────────────────────────────────────────┤
-   │                                                          │
-   │   ... stacks grow down ...                               │
-   │                                                          │
-   │  T1 stack  ◄── private to thread 1 (locals, call frames) │
-   │  T2 stack  ◄── private to thread 2                       │
-   │  T3 stack  ◄── private to thread 3                       │
-   └──────────────────────────────────────────────────────────┘
+   high addr  ┌──────────────────────────────────────────────────────────┐
+              │  T1 stack  ◄── private to thread 1 (locals, call frames) │
+              │  T2 stack  ◄── private to thread 2                       │
+              │  T3 stack  ◄── private to thread 3                       │
+              │                                                          │
+              │   ... stacks grow down ...                               │
+              │                                                          │
+              ├──────────────────────────────────────────────────────────┤
+              │                                                          │
+              │   ... heap grows up ...                                  │
+              │                                                          │
+              │  HEAP                ◄── shared (Box, Vec, String, ...)  │
+              │                          THIS is why Rust has Arc,       │
+              │                          Mutex, RwLock                   │
+              ├──────────────────────────────────────────────────────────┤
+              │  DATA / BSS          ◄── shared (globals, statics)       │
+              ├──────────────────────────────────────────────────────────┤
+              │  CODE / TEXT         ◄── shared by all threads           │
+              │  (compiled instructions, read-only)                      │
+   low  addr  └──────────────────────────────────────────────────────────┘
 
    Also shared across threads: fd table, signal handlers,
    current working directory, process ID, env vars.
@@ -551,7 +564,7 @@ ss -lntp | grep $PID          # see "LISTEN 0 ... 127.0.0.1:8080 ... pid=$PID,fd
 <li><strong>A multi-threaded server (Tokio, Go, Java):</strong> all worker threads share one fd table. One <code>TcpListener</code> fd is visible to every thread. The runtime routes accepted connections to whichever thread is free, all operating on fds in the single shared table.</li>
 <li><strong>A pre-fork server (Nginx, classic Apache):</strong> N child processes, each with its own fd table (copied from the parent at <code>fork()</code>), all holding their own fd pointing to the same underlying kernel socket. Works because the <em>socket</em> is refcounted — one process closing its fd doesn’t hurt the others.</li>
 </ul>
-<p><strong>Sharing, copying, inheritance.</strong> Fds have a few lifetime rules worth knowing, because they show up in every pre-fork server and every shell pipeline:</p>
+<p><strong>Sharing, copying, inheritance.</strong> Both patterns above leaned on mechanisms we haven’t actually spelled out yet — how <code>fork()</code> copies an fd table, why one process closing a socket fd doesn’t break the others, and (a few paragraphs down) how shell pipelines and <code>&gt;</code> redirection wire fds onto specific slots before <code>exec</code>. Three primitives do all the heavy lifting. Worth knowing by name:</p>
 <ul>
 <li><code>fork()</code> — the child gets a <em>copy</em> of the parent’s fd table. Both processes now have their own fd 3, both pointing to the same underlying socket. This is exactly how pre-fork servers (Apache, gunicorn) let multiple workers share one listening socket.</li>
 <li><code>dup(fd)</code> / <code>dup2(fd, newfd)</code> — make a <em>second</em> fd in your own table that points to the same resource. Shell redirection (<code>&gt;</code>, <code>&lt;</code>) works by duping an open file onto fd 1 or fd 0 before <code>exec</code>ing the command.</li>
