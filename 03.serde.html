@@ -1,0 +1,602 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>serde - Let&#x27;s sum Axum</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-35c9240a.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-83f4a4ad.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Let&#x27;s sum Axum</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="serde"><a class="header" href="#serde">serde</a></h1>
+<p>Serde is a framework for <strong>serializing</strong> and <strong>deserializing</strong> Rust data structures.</p>
+<ul>
+<li><strong>Serialize</strong> = turn a Rust value into bytes you can send/store (<code>User { name: "Alice" }</code> → <code>{"name":"Alice"}</code>).</li>
+<li><strong>Deserialize</strong> = the reverse (<code>{"name":"Alice"}</code> → <code>User { name: "Alice" }</code>).</li>
+</ul>
+<p>The clever part of serde is <strong>how</strong> it does this. It does not say: “here is a JSON-to-struct converter, here is a YAML-to-struct converter, here is a TOML-to-struct converter…” That would be one converter per (format × type) pair, which explodes the moment you have many of either.</p>
+<p>Instead, serde inserts a small <strong>middle world</strong> that both sides know how to talk to. The shape of the architecture is exactly the diagram:</p>
+<pre><code class="language-text">   ┌──────────┐         ┌──────────┐         ┌──────────┐
+   │  Rust    │         │  serde   │         │  bytes   │
+   │  type    │ ─────►  │   data   │ ─────►  │  in some │
+   │          │         │  model   │         │  format  │
+   │          │ ◄─────  │          │ ◄─────  │          │
+   └──────────┘         └──────────┘         └──────────┘
+        ▲                    ▲                    ▲
+        │                    │                    │
+   Serialize /          ~29 primitive       Serializer /
+   Deserialize             "shapes"          Deserializer
+   live on the type     (bool, i32, str,    live on the format
+                         seq, map, struct…)
+</code></pre>
+<p>Before we look at any code, let’s nail down what each of the five labels actually means.</p>
+<hr>
+<h2 id="1-data-type"><a class="header" href="#1-data-type">1. Data type</a></h2>
+<p>A <strong>data type</strong> is a concrete Rust type <em>you</em> define for <em>your</em> program.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct User {
+    name: String,
+    age: u32,
+    emails: Vec&lt;String&gt;,
+}
+<span class="boring">}</span></code></pre>
+<p><code>User</code> only exists in your code. It has fields, lifetimes, ownership rules — all the Rust-specific machinery. A JSON file has never heard of <code>User</code>, and <code>User</code> has never heard of JSON.</p>
+<p>“Data type” here means “whatever Rust type you happen to have today” — <code>User</code>, <code>Config</code>, <code>Vec&lt;Order&gt;</code>, <code>HashMap&lt;String, i64&gt;</code>, whatever. Every program has its own zoo of these.</p>
+<hr>
+<h2 id="2-data-format"><a class="header" href="#2-data-format">2. Data format</a></h2>
+<p>A <strong>data format</strong> is the byte-level encoding you want to read from or write to.</p>
+<ul>
+<li>JSON: <code>{"name":"Alice","age":30}</code></li>
+<li>YAML: <code>name: Alice\nage: 30</code></li>
+<li>TOML: <code>name = "Alice"\nage = 30</code></li>
+<li>bincode: a compact binary blob — not human-readable.</li>
+<li>MessagePack, CBOR, RON, XML, … the list is long.</li>
+</ul>
+<p>A format is just a <em>convention about bytes</em>: which characters mean “start of object”, how strings are quoted, whether numbers are decimal or binary, etc. It has no idea what a <code>User</code> is either — it only knows how to encode generic things like “a string”, “an integer”, “a list of stuff”, “a key/value object”.</p>
+<p>“Data format” stands for “whatever encoding you happen to need today”. Every program might support several of them.</p>
+<hr>
+<h2 id="3-data-model"><a class="header" href="#3-data-model">3. Data model</a></h2>
+<p>This is the key invention. The <strong>serde data model</strong> is a small, fixed vocabulary that sits in the middle and that <em>both sides agree on</em>.</p>
+<p>It is a list of about 29 primitive “shapes” that any data can be described in terms of. The big ones:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Category</th><th>Members</th></tr>
+</thead>
+<tbody>
+<tr><td>Booleans</td><td><code>bool</code></td></tr>
+<tr><td>Integers</td><td><code>i8 i16 i32 i64 i128</code>, <code>u8 u16 u32 u64 u128</code></td></tr>
+<tr><td>Floats</td><td><code>f32 f64</code></td></tr>
+<tr><td>Text</td><td><code>char</code>, <code>str</code></td></tr>
+<tr><td>Bytes</td><td><code>bytes</code></td></tr>
+<tr><td>Optionals</td><td><code>none</code>, <code>some</code></td></tr>
+<tr><td>Unit-ish</td><td><code>unit</code>, <code>unit_struct</code>, <code>unit_variant</code></td></tr>
+<tr><td>Newtypes</td><td><code>newtype_struct</code>, <code>newtype_variant</code></td></tr>
+<tr><td>Sequences</td><td><code>seq</code>, <code>tuple</code>, <code>tuple_struct</code>, <code>tuple_variant</code></td></tr>
+<tr><td>Maps &amp; structs</td><td><code>map</code>, <code>struct</code>, <code>struct_variant</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>That is <strong>it</strong>. Every Rust type, no matter how exotic, is described to serde as some combination of those shapes. Every format, no matter how exotic, is told to write some combination of those shapes.</p>
+<p>The data model is the <strong>shared language</strong>. Neither side speaks the other’s tongue, but both speak “model”.</p>
+<pre><code class="language-text">            ┌──────────────────────┐
+  Rust type ├──► "this is a struct │   ─►  JSON  writer
+            │     with 2 fields:   │
+            │     name: str,       │   ─►  YAML  writer
+            │     age: u32"        │
+            └──────────────────────┘   ─►  bincode writer
+                  the data model
+</code></pre>
+<p>Why is this a win? Because of the N + M vs. N × M math:</p>
+<ul>
+<li>Without the model: every Rust type would need to know how to write itself to <em>every</em> format. 100 types × 10 formats = 1000 hand-written converters.</li>
+<li>With the model: each type only learns to talk to the model (100 implementations), and each format only learns to talk to the model (10 implementations). Total: 110.</li>
+</ul>
+<p>You only ever cross <strong>one</strong> edge at a time. Type ↔ model, then model ↔ format.</p>
+<hr>
+<h2 id="4-serialize--the-trait-on-the-data-type"><a class="header" href="#4-serialize--the-trait-on-the-data-type">4. Serialize — the trait on the data type</a></h2>
+<p><code>Serialize</code> is a trait that lives on your data type. Implementing it is how the data type learns to describe itself in terms of the data model.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// simplified
+pub trait Serialize {
+    fn serialize&lt;S: Serializer&gt;(&amp;self, serializer: S) -&gt; Result&lt;S::Ok, S::Error&gt;;
+}
+<span class="boring">}</span></code></pre>
+<p>Read the method out loud: <em>“Given some serializer, describe myself to it.”</em></p>
+<p>A <code>Serialize</code> impl for <code>User</code> says, in effect:</p>
+<blockquote>
+<p>“I am a <strong>struct</strong> called <code>User</code> with <strong>3 fields</strong>: <code>name</code> is a string, <code>age</code> is a u32, <code>emails</code> is a sequence of strings.”</p>
+</blockquote>
+<p>It does <strong>not</strong> say “write <code>{</code>, then write <code>"name":</code>, then write <code>"Alice"</code>”. It never mentions JSON, never mentions YAML. It only ever mentions data-model words like <code>struct</code>, <code>field</code>, <code>str</code>, <code>u32</code>, <code>seq</code>.</p>
+<p>In practice you almost never write this by hand — you derive it:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use serde::Serialize;
+
+#[derive(Serialize)]
+struct User {
+    name: String,
+    age: u32,
+    emails: Vec&lt;String&gt;,
+}
+<span class="boring">}</span></code></pre>
+<p>The macro generates the impl for you. Either way, the result is the same: a method that walks the type and describes it to whichever serializer it is handed. <strong><code>Deserialize</code></strong> is the mirror trait — <em>“given some deserializer, build me from it.”</em></p>
+<hr>
+<h2 id="5-serializer--the-trait-on-the-format"><a class="header" href="#5-serializer--the-trait-on-the-format">5. Serializer — the trait on the format</a></h2>
+<p><code>Serializer</code> is a trait that lives on the <strong>format side</strong>. Implementing it is how the format learns to turn data-model words into bytes.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// extremely simplified
+pub trait Serializer {
+    fn serialize_bool(self, v: bool)   -&gt; Result&lt;Self::Ok, Self::Error&gt;;
+    fn serialize_i32(self, v: i32)     -&gt; Result&lt;Self::Ok, Self::Error&gt;;
+    fn serialize_str(self, v: &amp;str)    -&gt; Result&lt;Self::Ok, Self::Error&gt;;
+    fn serialize_struct(self, name: &amp;'static str, len: usize) -&gt; ...;
+    fn serialize_seq(self, len: Option&lt;usize&gt;) -&gt; ...;
+    // ... ~29 methods, one per data-model shape
+}
+<span class="boring">}</span></code></pre>
+<p>A format crate like <code>serde_json</code> provides a struct (e.g. <code>JsonSerializer</code>) that implements every one of these methods by writing JSON bytes:</p>
+<ul>
+<li><code>serialize_bool(true)</code> → write <code>true</code></li>
+<li><code>serialize_str("Alice")</code> → write <code>"Alice"</code> (with quotes and escapes)</li>
+<li><code>serialize_struct("User", 3)</code> → write <code>{</code>, remember to write <code>}</code> at the end</li>
+<li><code>serialize_seq(Some(2))</code> → write <code>[</code>, remember to write <code>]</code> at the end</li>
+</ul>
+<p>A different format crate like <code>bincode</code> provides its own struct that implements the <em>same</em> methods but writes a compact binary form instead. <strong><code>Deserializer</code></strong> is the mirror trait — it reads bytes and <em>calls back</em> into the type’s <code>Deserialize</code> impl, telling it “I just read a string”, “I just read the start of a map”, etc.</p>
+<p>The serializer is what turns “I am a struct with 3 fields” into actual <code>{"name":"Alice","age":30,"emails":[...]}</code> bytes.</p>
+<hr>
+<h2 id="putting-the-five-together"><a class="header" href="#putting-the-five-together">Putting the five together</a></h2>
+<p>The moment of conversion looks like this:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let user = User { name: "Alice".into(), age: 30, emails: vec![] };
+let json = serde_json::to_string(&amp;user)?;     // "{\"name\":\"Alice\",...}"
+<span class="boring">}</span></code></pre>
+<p>What actually happens under the hood, in slow motion:</p>
+<pre><code class="language-text">1. serde_json::to_string  builds a  JsonSerializer  (a Serializer impl).
+2. It calls  user.serialize(json_serializer).
+3. The derived Serialize impl on User says, in model words:
+       "serializer, I am a struct called 'User' with 3 fields."
+       "field 'name' is a str: 'Alice'"
+       "field 'age'  is a u32: 30"
+       "field 'emails' is a seq of str: []"
+4. Each of those calls hits a method on JsonSerializer, which writes
+   the matching JSON bytes into a buffer.
+5. The buffer is returned as a String.
+</code></pre>
+<p>Notice what was <strong>not</strong> in that pipeline:</p>
+<ul>
+<li><code>User</code> never saw a <code>{</code> or a <code>"</code>.</li>
+<li><code>JsonSerializer</code> never saw the name <code>User</code> until step 3 told it.</li>
+<li>Neither side imported the other.</li>
+</ul>
+<p>Swap <code>serde_json</code> for <code>serde_yaml</code> and step 1 builds a <code>YamlSerializer</code> instead. <strong>Steps 2 and 3 do not change at all</strong> — your <code>User</code> still describes itself in the same model words; it is just that a different listener is now translating those words into different bytes.</p>
+<p>That is the whole magic. The five pieces lock together like this:</p>
+<pre><code class="language-text">   data type    ──Serialize──►   data model   ──Serializer──►   data format
+                 (trait on                     (trait on
+                  your type)                    the format)
+</code></pre>
+<p>Each arrow is exactly one trait. Each trait crosses exactly one edge of the diagram. Hold on to that picture — every deeper topic in serde (visitors, <code>Deserializer</code> lifetimes, zero-copy, format-specific attributes, custom impls) is just zooming into one of these arrows.</p>
+<h3 id="one-type-two-formats-meeting-in-the-middle"><a class="header" href="#one-type-two-formats-meeting-in-the-middle">One type, two formats, meeting in the middle</a></h3>
+<p>The real serde <code>Serializer</code> trait has about 29 methods (one per data-model word) which is too much to show all at once. So for this example, let’s pretend serde is much smaller — its data-model vocabulary has only <strong>3 words</strong>: <em>“start a struct”</em>, <em>“here is an i32 field”</em>, <em>“end the struct”</em>. That is enough to handle our <code>Point</code>.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// PRETEND SERDE — a tiny stand-in for the real Serializer trait.
+// The "data-model vocabulary" is just these three methods.
+trait MiniSerializer {
+    fn start_struct(&amp;mut self, name: &amp;'static str);
+    fn field_i32(&amp;mut self, key: &amp;'static str, value: i32);
+    fn end_struct(&amp;mut self);
+}
+<span class="boring">}</span></code></pre>
+<p>Now <strong>one data type</strong> that only knows how to describe itself in those three words:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// THE DATA TYPE — never mentions any format.
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn serialize&lt;S: MiniSerializer&gt;(&amp;self, s: &amp;mut S) {
+        s.start_struct("Point");          // model word 1
+        s.field_i32("x", self.x);         // model word 2
+        s.field_i32("y", self.y);         // model word 2
+        s.end_struct();                   // model word 3
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Now <strong>two formats</strong> that only know how to turn those three words into bytes:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// FORMAT A — writes "(x=1, y=2)". Never mentions Point.
+struct ParenWriter { buf: String, first: bool }
+
+impl MiniSerializer for ParenWriter {
+    fn start_struct(&amp;mut self, _name: &amp;'static str) {
+        self.buf.push('(');
+        self.first = true;
+    }
+    fn field_i32(&amp;mut self, key: &amp;'static str, value: i32) {
+        if !self.first { self.buf.push_str(", "); }
+        self.first = false;
+        self.buf.push_str(key);            // "x"
+        self.buf.push('=');                // "="
+        self.buf.push_str(&amp;value.to_string());  // "1"
+    }
+    fn end_struct(&amp;mut self) {
+        self.buf.push(')');
+    }
+}
+<span class="boring">}</span></code></pre>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// FORMAT B — writes "1,2". Never mentions Point either.
+struct CsvWriter { buf: String, first: bool }
+
+impl MiniSerializer for CsvWriter {
+    fn start_struct(&amp;mut self, _name: &amp;'static str) {
+        self.first = true;                 // nothing to open
+    }
+    fn field_i32(&amp;mut self, _key: &amp;'static str, value: i32) {
+        if !self.first { self.buf.push(','); }
+        self.first = false;
+        self.buf.push_str(&amp;value.to_string());  // CSV ignores the key
+    }
+    fn end_struct(&amp;mut self) {
+        // nothing to close
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Notice that <strong>each format makes different choices for the same three model words</strong>: <code>ParenWriter::start_struct</code> opens a <code>(</code>, while <code>CsvWriter::start_struct</code> writes nothing. <code>ParenWriter::field_i32</code> uses the key (<code>"x="</code>), while <code>CsvWriter::field_i32</code> discards it. Same vocabulary, different bytes.</p>
+<p>Now the meeting:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let p = Point { x: 1, y: 2 };
+
+let mut a = ParenWriter { buf: String::new(), first: true };
+p.serialize(&amp;mut a);
+// a.buf == "(x=1, y=2)"
+
+let mut b = CsvWriter { buf: String::new(), first: true };
+p.serialize(&amp;mut b);
+// b.buf == "1,2"
+<span class="boring">}</span></code></pre>
+<p>Trace the first call in your head: <code>p.serialize(&amp;mut a)</code> runs the <strong>one</strong> <code>Point::serialize</code> body. Line 1 calls <code>a.start_struct("Point")</code> → <code>a.buf</code> is now <code>"("</code>. Line 2 calls <code>a.field_i32("x", 1)</code> → <code>a.buf</code> is now <code>"(x=1"</code>. Line 3 calls <code>a.field_i32("y", 2)</code> → <code>a.buf</code> is now <code>"(x=1, y=2"</code>. Line 4 calls <code>a.end_struct()</code> → <code>a.buf</code> is now <code>"(x=1, y=2)"</code>. The second call is identical except the methods belong to <code>CsvWriter</code>, so different bytes come out.</p>
+<p>Three things to notice — they are the whole point:</p>
+<ol>
+<li><strong><code>Point::serialize</code> was written once.</strong> The exact same method body ran in both calls. It never mentions <code>ParenWriter</code> or <code>CsvWriter</code>, never imports them, never knows what bytes will appear.</li>
+<li><strong><code>ParenWriter</code> and <code>CsvWriter</code> were written without ever importing <code>Point</code>.</strong> They only know what to do when handed the three model words. They don’t care that those words happened to describe a <code>Point</code> this time — anything that calls <code>start_struct</code> / <code>field_i32</code> / <code>end_struct</code> would work.</li>
+<li><strong>The meeting happens directly at <code>.serialize(&amp;mut a)</code> and <code>.serialize(&amp;mut b)</code>.</strong> No translator sits between them. Both sides agreed on the same three-word vocabulary, so the conversation just works.</li>
+</ol>
+<p>Now add one more type — say <code>struct Color { r: i32, g: i32, b: i32 }</code> with its own <code>serialize</code> method that calls the same three model words — and <strong>both writers handle it for free</strong>, with zero changes to either format’s code. Add one more format — say an <code>XmlWriter</code> that turns the same three words into <code>&lt;Point&gt;&lt;x&gt;1&lt;/x&gt;&lt;y&gt;2&lt;/y&gt;&lt;/Point&gt;</code> — and <strong><code>Point</code> and <code>Color</code> both work with it for free</strong>, with zero changes to either type’s code.</p>
+<p>That is N + M, not N × M, in concrete form. Real serde works exactly the same way; it just has 29 model words instead of 3, which is enough to describe every Rust type you will ever want to serialize.</p>
+<h3 id="the-other-direction-two-formats-one-type-meeting-in-the-middle"><a class="header" href="#the-other-direction-two-formats-one-type-meeting-in-the-middle">The other direction: two formats, one type, meeting in the middle</a></h3>
+<p>Deserializing is the mirror image. Bytes already exist in some format, and we want to <strong>end up with a <code>Point</code></strong>. The three model words flip direction: instead of the type <em>telling</em> the format “here is a struct-start, here is an i32 field, here is a struct-end”, the format <strong>answers</strong> when the type asks for them.</p>
+<p>Same trick, same vocabulary, played backwards. Our pretend data-model still has three words, but now each one is a question the type asks and the format answers:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// PRETEND SERDE — mirror of MiniSerializer. The format does the parsing
+// and just hands back primitive values when asked.
+trait MiniDeserializer {
+    fn start_struct(&amp;mut self);
+    fn field_i32(&amp;mut self, key: &amp;'static str) -&gt; i32;
+    fn end_struct(&amp;mut self);
+}
+<span class="boring">}</span></code></pre>
+<p>The data type now learns to <strong>build itself</strong> from those three words — it asks for what it needs in order, and trusts the deserializer to deliver an <code>i32</code> when prompted:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// THE DATA TYPE — still never mentions any format.
+impl Point {
+    fn deserialize&lt;D: MiniDeserializer&gt;(d: &amp;mut D) -&gt; Point {
+        d.start_struct();                  // model word 1
+        let x = d.field_i32("x");          // model word 2
+        let y = d.field_i32("y");          // model word 2
+        d.end_struct();                    // model word 3
+        Point { x, y }
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Two formats that know how to chew through bytes and answer those three questions:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// FORMAT A — parses "(x=1, y=2)". Never mentions Point.
+struct ParenReader&lt;'a&gt; { input: &amp;'a str, pos: usize }
+
+impl&lt;'a&gt; MiniDeserializer for ParenReader&lt;'a&gt; {
+    fn start_struct(&amp;mut self) {
+        self.pos += 1;                     // skip the opening '('
+    }
+    fn field_i32(&amp;mut self, key: &amp;'static str) -&gt; i32 {
+        if self.input.as_bytes()[self.pos] == b',' {
+            self.pos += 2;                 // skip ", " between fields
+        }
+        self.pos += key.len() + 1;         // skip the key and '='
+        let start = self.pos;
+        while self.pos &lt; self.input.len()
+            &amp;&amp; self.input.as_bytes()[self.pos].is_ascii_digit()
+        {
+            self.pos += 1;
+        }
+        self.input[start..self.pos].parse().unwrap()
+    }
+    fn end_struct(&amp;mut self) {
+        self.pos += 1;                     // skip ')'
+    }
+}
+<span class="boring">}</span></code></pre>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// FORMAT B — parses "1,2". Never mentions Point either.
+struct CsvReader&lt;'a&gt; { input: &amp;'a str, pos: usize }
+
+impl&lt;'a&gt; MiniDeserializer for CsvReader&lt;'a&gt; {
+    fn start_struct(&amp;mut self) {
+        // nothing to open
+    }
+    fn field_i32(&amp;mut self, _key: &amp;'static str) -&gt; i32 {
+        if self.pos &gt; 0 &amp;&amp; self.input.as_bytes()[self.pos] == b',' {
+            self.pos += 1;                 // skip ',' between fields
+        }
+        let start = self.pos;
+        while self.pos &lt; self.input.len()
+            &amp;&amp; self.input.as_bytes()[self.pos].is_ascii_digit()
+        {
+            self.pos += 1;
+        }
+        self.input[start..self.pos].parse().unwrap()  // CSV ignored the key
+    }
+    fn end_struct(&amp;mut self) {
+        // nothing to close
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Same role-reversal as before: <strong>each format makes different choices for the same three model words</strong>. <code>ParenReader::start_struct</code> eats a <code>(</code>, while <code>CsvReader::start_struct</code> eats nothing. <code>ParenReader::field_i32</code> reads past the key (<code>"x="</code>), while <code>CsvReader::field_i32</code> discards it. Same vocabulary, different bytes.</p>
+<p>Now the meeting:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut a = ParenReader { input: "(x=1, y=2)", pos: 0 };
+let p1 = Point::deserialize(&amp;mut a);
+// p1 == Point { x: 1, y: 2 }
+
+let mut b = CsvReader { input: "1,2", pos: 0 };
+let p2 = Point::deserialize(&amp;mut b);
+// p2 == Point { x: 1, y: 2 }
+<span class="boring">}</span></code></pre>
+<p>Trace the first call: <code>Point::deserialize(&amp;mut a)</code> runs the <strong>one</strong> body. <code>a.start_struct()</code> consumes <code>(</code>. <code>a.field_i32("x")</code> skips past <code>x=</code>, reads <code>1</code>, returns <code>1</code>. <code>a.field_i32("y")</code> skips past <code>, y=</code>, reads <code>2</code>, returns <code>2</code>. <code>a.end_struct()</code> consumes <code>)</code>. The returned <code>Point { x: 1, y: 2 }</code> is bit-for-bit identical to what falls out of <code>CsvReader</code> parsing <code>"1,2"</code> — completely different bytes, completely different parsing logic, <strong>same struct at the end</strong>.</p>
+<p>The same three observations apply, mirrored:</p>
+<ol>
+<li><strong><code>Point::deserialize</code> was written once.</strong> The exact same method body ran in both calls. It never mentions <code>ParenReader</code> or <code>CsvReader</code>, and has no idea what bytes were on disk.</li>
+<li><strong><code>ParenReader</code> and <code>CsvReader</code> were written without ever importing <code>Point</code>.</strong> They only know how to answer the three model questions. Anything that calls <code>start_struct</code> / <code>field_i32</code> / <code>end_struct</code> in the right order would work — <code>Color</code> from earlier would deserialize for free.</li>
+<li><strong>The meeting happens directly at <code>Point::deserialize(&amp;mut a)</code> and <code>Point::deserialize(&amp;mut b)</code>.</strong> Both sides agreed on the same three-word vocabulary; the conversation just runs backwards now.</li>
+</ol>
+<p>So the full picture is symmetric:</p>
+<pre><code class="language-text">   data type   ◄──Deserialize──   data model   ◄──Deserializer──   data format
+                (trait on                       (trait on
+                 your type)                      the format)
+</code></pre>
+<p>Serialization walks left-to-right; deserialization walks right-to-left. The middle world — the data model with its ~29 words — is the same in both directions. That is why <code>#[derive(Serialize, Deserialize)]</code> gives you both for free: same vocabulary, played in opposite directions.</p>
+<p>In the next sections we will do the zooming, one arrow at a time.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="02.middlewares.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="02.middlewares.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

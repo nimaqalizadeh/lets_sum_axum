@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a194e805.js";
+            window.path_to_searchindex_js = "searchindex-35c9240a.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-51710b19.js"></script>
+        <script src="toc-83f4a4ad.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -1824,6 +1824,1065 @@ lscpu              # full breakdown (sockets, cores, threads per core)
 <li><strong>Bind narrowly.</strong> <code>0.0.0.0</code> in production is a choice, not a default. If the service is internal, bind to a private interface.</li>
 </ul>
 <p>The rest of the book assumes this much background. When a later chapter says “the handler returns immediately but hyper is still writing the body,” or “extractors run in the order they appear because each one may park the task,” that’s this machinery in action.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="middlewares"><a class="header" href="#middlewares">Middlewares</a></h1>
+<h2 id="the-goal"><a class="header" href="#the-goal">The goal</a></h2>
+<p>We already have a working handler that greets a user: given a name, it returns <code>"Hello, Alice!"</code>. That’s the <strong>business logic</strong>, and it works fine on its own.</p>
+<p>Now we want to add something that has <strong>nothing to do with the greeting itself</strong>: every time a request comes in, we want to print a log line <em>before</em> the handler runs, and another log line <em>after</em> the handler returns. Something like:</p>
+<pre><code class="language-text">&gt;&gt;&gt; INCOMING REQUEST: Request { method: GET, path: "/hello", name: "Alice" }
+&lt;&lt;&lt; OUTGOING RESPONSE: Ok("Hello, Alice!")
+</code></pre>
+<p>We could just paste two <code>println!</code> calls inside <code>HelloHandler</code> and call it a day. But:</p>
+<ul>
+<li>We will have many handlers (<code>/users</code>, <code>/posts</code>, <code>/comments</code>…) and would have to paste the same logging code into every one of them.</li>
+<li>Logging is not the handler’s job. The handler should stay focused on greeting users; logging, auth, rate-limiting, etc. are <em>cross-cutting concerns</em> that belong somewhere else.</li>
+</ul>
+<p>The clean solution is <strong>middleware</strong>: a separate piece of code that <strong>wraps</strong> the handler from the outside. It runs <em>before</em> and <em>after</em> the handler, without the handler knowing it exists. In Axum (via Tower), the tools for building middleware are the <strong><code>Service</code></strong> and <strong><code>Layer</code></strong> traits.</p>
+<h3 id="logging-is-just-the-first-example"><a class="header" href="#logging-is-just-the-first-example">Logging is just the first example</a></h3>
+<p>We are using logging because it is the easiest thing to demonstrate — a single <code>println!</code> makes the <em>before</em> and <em>after</em> hooks obvious. But the same wrapping pattern handles every cross-cutting concern in a real server:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Middleware</th><th>What it does <em>before</em> the handler</th><th>What it does <em>after</em> the handler</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Logging</strong></td><td>Print the incoming request</td><td>Print the outgoing response</td></tr>
+<tr><td><strong>Authentication</strong></td><td>Read the <code>Authorization</code> header; reject with <code>401</code> if invalid</td><td>(nothing)</td></tr>
+<tr><td><strong>Rate limiting</strong></td><td>Check the client’s request count; reject with <code>429</code> if over quota</td><td>Increment the counter</td></tr>
+<tr><td><strong>Compression</strong></td><td>(nothing)</td><td>Gzip the response body</td></tr>
+<tr><td><strong>Timeout</strong></td><td>Start a timer</td><td>Cancel if the handler takes too long</td></tr>
+<tr><td><strong>CORS</strong></td><td>Reject disallowed origins</td><td>Add <code>Access-Control-*</code> headers</td></tr>
+<tr><td><strong>Tracing / metrics</strong></td><td>Start a span / timer</td><td>Record duration, attach status code</td></tr>
+</tbody>
+</table>
+</div>
+<p>Every one of these is built the same way: a wrapper struct that holds an <code>inner</code> service, a <code>call</code> method that does something <em>before</em> <code>self.inner.call(req).await</code> and something <em>after</em>, plus a tiny <code>Layer</code> factory to plug it into the router. Once the logging example clicks, you have learned the pattern for <strong>all of them</strong>.</p>
+<blockquote>
+<p><strong>What is “inner”?</strong>
+In the simplest case, <code>inner</code> is the <strong>handler</strong> itself (e.g. <code>HelloHandler</code>). But “inner” really means <em>whatever Service is one step closer to the work</em>. In our chapter, we will call <code>.layer(LoggingLayer)</code> on the whole <strong>router</strong>, so <code>inner</code> will be the <code>Router</code>, which then dispatches to <code>HelloHandler</code>. And if we stacked another middleware like <code>.layer(AuthLayer).layer(LoggingLayer)</code>, then <code>LoggingService</code>’s <code>inner</code> would be the <code>AuthService</code> — middlewares can wrap middlewares. Anything that implements <code>Service&lt;Request&gt;</code> can be the <code>inner</code>.</p>
+</blockquote>
+<p>This chapter shows exactly how those two traits, plus the <code>Router</code>, fit together to make the snippet at the bottom of this introduction work. We will:</p>
+<ol>
+<li>Meet the three characters and write each one’s code.</li>
+<li>See how <code>.layer(...)</code> actually wraps the router.</li>
+<li>Open the hood and watch what the compiler does with the generic <code>S</code>.</li>
+<li>Trace a real request from the socket all the way back to the browser.</li>
+</ol>
+<p>By the end you should be able to read this snippet and know exactly what happens, line by line:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// 1. Create the router, add a route, wrap it in our layer.
+let app = Router::new()
+    .route("/hello", get(HelloHandler))
+    .layer(LoggingLayer);
+
+// 2. Start the server.
+axum::Server::bind(&amp;"0.0.0.0:3000")
+    .serve(app.into_make_service())
+    .await;
+<span class="boring">}</span></code></pre>
+<p>The three characters:</p>
+<ul>
+<li><strong><code>HelloHandler</code></strong> — the <strong>Worker</strong> that does the actual job.</li>
+<li><strong><code>LoggingService&lt;S&gt;</code> / <code>LoggingLayer</code></strong> — the <strong>Guard</strong> that wraps the Worker.</li>
+<li><strong><code>Router</code></strong> — the <strong>Dispatcher</strong> that decides which Worker handles which path.</li>
+</ul>
+<hr>
+<h2 id="warmup-the-same-pattern-with-no-async-no-result-no-future"><a class="header" href="#warmup-the-same-pattern-with-no-async-no-result-no-future">Warmup: the same pattern with no async, no <code>Result</code>, no <code>Future</code></a></h2>
+<p>Before we meet the real <code>Service&lt;Request&gt;</code> trait — which is generic, asynchronous, returns a <code>Result</code>, and has multiple associated types — here is <strong>the whole chapter’s pattern</strong> stripped to its bones. No async. No <code>Pin</code>. No <code>Result</code>. No <code>Future</code>. Just plain synchronous Rust.</p>
+<p>If the ~50 lines below click, the rest of the chapter is just bolting async and error handling onto the exact same shape.</p>
+<pre class="playground"><code class="language-rust">// === THE TWO TRAITS — one method each ===
+
+// A "Service" is just a thing that takes a request and produces a response.
+trait MiniService {
+    fn handle(&amp;self, req: &amp;str) -&gt; String;
+}
+
+// A "Layer" is just a thing that wraps an inner Service to produce a new one.
+trait MiniLayer&lt;S&gt; {
+    type Wrapped: MiniService;
+    fn wrap(&amp;self, inner: S) -&gt; Self::Wrapped;
+}
+
+// === THE WORKER — does the real work ===
+
+struct HelloHandler;
+impl MiniService for HelloHandler {
+    fn handle(&amp;self, req: &amp;str) -&gt; String {
+        format!("Hello, {}!", req)
+    }
+}
+
+// === THE WRAPPER — runs BEFORE, delegates to inner, runs AFTER ===
+
+struct LoggingService&lt;S&gt; { inner: S }
+
+impl&lt;S: MiniService&gt; MiniService for LoggingService&lt;S&gt; {
+    fn handle(&amp;self, req: &amp;str) -&gt; String {
+        println!("&gt;&gt;&gt; {}", req);                  // BEFORE
+        let response = self.inner.handle(req);    // PASS DOWN
+        println!("&lt;&lt;&lt; {}", response);             // AFTER
+        response                                   // RETURN
+    }
+}
+
+// === THE FACTORY — produces a LoggingService around any inner Service ===
+
+struct LoggingLayer;
+impl&lt;S: MiniService&gt; MiniLayer&lt;S&gt; for LoggingLayer {
+    type Wrapped = LoggingService&lt;S&gt;;
+    fn wrap(&amp;self, inner: S) -&gt; Self::Wrapped {
+        LoggingService { inner }
+    }
+}
+
+// === THE MEETING ===
+
+fn main() {
+    let handler = HelloHandler;             // the worker
+    let layer   = LoggingLayer;             // the factory
+    let app     = layer.wrap(handler);      // wrap = LoggingService { inner: handler }
+
+    let out = app.handle("Alice");
+    println!("FINAL: {}", out);
+}</code></pre>
+<p>Run it; the terminal prints:</p>
+<pre><code class="language-text">&gt;&gt;&gt; Alice
+&lt;&lt;&lt; Hello, Alice!
+FINAL: Hello, Alice!
+</code></pre>
+<p>Three things to notice — they are the whole pattern:</p>
+<ol>
+<li><strong><code>MiniService</code> is one method.</strong> <code>handle(req) -&gt; response</code>. A “service” is just a thing that takes a request and returns a response. Nothing more.</li>
+<li><strong><code>LoggingService&lt;S&gt;</code> is the wrap shape.</strong> Its <code>handle</code> runs <em>before</em> code, then calls <code>self.inner.handle(req)</code>, then runs <em>after</em> code, then returns. <strong>Every middleware in this chapter</strong> — and every middleware in real Tower — follows that exact shape.</li>
+<li><strong><code>LoggingLayer</code> is the factory.</strong> Its <code>wrap(inner)</code> body is <strong>one line</strong>: <code>LoggingService { inner }</code>. The factory exists so the router can build a wrap without ever importing <code>LoggingService</code>.</li>
+</ol>
+<h3 id="stacking-layers-still-works"><a class="header" href="#stacking-layers-still-works">Stacking layers still works</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let app = LoggingLayer.wrap(AuthLayer.wrap(HelloHandler));
+//        └─────────── outer ───────────┘
+//                         └── inner ──┘
+// = LoggingService { inner: AuthService { inner: HelloHandler } }
+<span class="boring">}</span></code></pre>
+<p>Calling <code>app.handle(req)</code> walks: logging-BEFORE → auth-BEFORE → handler → auth-AFTER → logging-AFTER. Same shape, just nested.</p>
+<h3 id="a-mini-router-is-itself-a-service"><a class="header" href="#a-mini-router-is-itself-a-service">A mini Router is itself a Service</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct MiniRouter {
+    routes: Vec&lt;(&amp;'static str, Box&lt;dyn MiniService&gt;)&gt;,
+}
+
+impl MiniService for MiniRouter {
+    fn handle(&amp;self, req: &amp;str) -&gt; String {
+        // assume request format: "&lt;path&gt; &lt;body&gt;" — e.g. "/hello Alice"
+        let (path, body) = req.split_once(' ').unwrap_or((req, ""));
+        for (p, svc) in &amp;self.routes {
+            if *p == path { return svc.handle(body); }
+        }
+        format!("404: {}", path)
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Because <code>MiniRouter</code> itself implements <code>MiniService</code>, you can write <code>LoggingLayer.wrap(router)</code> and the logging applies to <strong>every</strong> route below — exactly the trick the real <code>axum::Router</code> uses.</p>
+<h3 id="whats-missing-from-this-mini-version"><a class="header" href="#whats-missing-from-this-mini-version">What’s missing from this mini version</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>This warmup</th><th>Real <code>tower::Service</code> adds</th></tr>
+</thead>
+<tbody>
+<tr><td><code>fn handle(&amp;self, req: &amp;str) -&gt; String</code></td><td><code>async fn call(&amp;mut self, req: Request) -&gt; Result&lt;Response, Error&gt;</code></td></tr>
+<tr><td>Plain synchronous call</td><td>Async — returns a <code>Future</code>, suspends on <code>.await</code></td></tr>
+<tr><td>Hard-coded <code>&amp;str</code> / <code>String</code></td><td>A real <code>Request</code> type with method, path, headers, body</td></tr>
+<tr><td>One associated type (<code>Wrapped</code>)</td><td>Three associated types (<code>Response</code>, <code>Error</code>, <code>Future</code>)</td></tr>
+</tbody>
+</table>
+</div>
+<p>That is the entire delta. The rest of this chapter is bolting those four things onto the exact pattern you just read. <strong><code>handle</code> becomes <code>call</code>, calls become <code>.await</code>, the return becomes <code>Result&lt;Response, Error&gt;</code>.</strong> Nothing else changes.</p>
+<hr>
+<h2 id="1-the-worker-hellohandler"><a class="header" href="#1-the-worker-hellohandler">1. The Worker: <code>HelloHandler</code></a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct HelloHandler;
+
+impl Service&lt;Request&gt; for HelloHandler {
+    type Response = String;   // the worker produces a String
+
+    async fn call(&amp;mut self, req: Request) -&gt; Result&lt;String, Error&gt; {
+        Ok(format!("Hello, {}!", req.name))
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Anything that implements <code>Service&lt;Request&gt;</code> is a worker. Its <code>call</code> method takes a request and returns a response. <code>HelloHandler</code> is the simplest possible worker — no state, one job, returns a string.</p>
+<h3 id="a-note-on-request"><a class="header" href="#a-note-on-request">A note on <code>Request</code></a></h3>
+<p>Throughout this chapter, <code>Request</code> is a <strong>teaching simplification</strong> — a small struct with just enough fields to demonstrate Service / Layer / Router:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// What this book pretends Request is:
+struct Request {
+    method: Method,   // GET, POST, ...
+    path:   String,   // "/hello"
+    name:   String,   // payload data — req.name is accessed in HelloHandler
+}
+<span class="boring">}</span></code></pre>
+<p>The <code>name</code> field is a shortcut for “whatever the user sent”. It is not a real HTTP concept.</p>
+<p>In <strong>real Axum</strong>, <code>Request</code> is not a custom struct at all. It comes from the <code>http</code> crate and is generic over its body type:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// from the `http` crate
+pub struct Request&lt;T&gt; {
+    head: Parts,   // method, URI, version, headers, extensions
+    body: T,       // the body — a type parameter
+}
+
+// axum pins T to its own Body type:
+pub type Request&lt;B = Body&gt; = http::Request&lt;B&gt;;
+<span class="boring">}</span></code></pre>
+<p>So a real <code>Service&lt;Request&gt;</code> is <code>Service&lt;http::Request&lt;axum::body::Body&gt;&gt;</code>. The body is an async byte stream — you don’t access it as <code>req.name</code>; you call extractors like <code>Json&lt;T&gt;</code>, <code>Form&lt;T&gt;</code>, or <code>Bytes</code> to parse it.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Aspect</th><th>Book’s <code>Request</code></th><th>Real Axum <code>Request</code></th></tr>
+</thead>
+<tbody>
+<tr><td>Defined where</td><td>Made up for this book</td><td><code>http::Request&lt;B&gt;</code>, re-exported by Axum</td></tr>
+<tr><td>Generic?</td><td>No</td><td>Yes — <code>Request&lt;T&gt;</code>, <code>T</code> is the body type</td></tr>
+<tr><td>Fields</td><td><code>method</code>, <code>path</code>, <code>name</code></td><td><code>method</code>, <code>uri</code>, <code>version</code>, <code>headers</code>, <code>extensions</code>, <code>body: T</code></td></tr>
+<tr><td>Body access</td><td>Direct field: <code>req.name</code></td><td>Async stream; parse via extractors like <code>Json&lt;T&gt;</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The Service / Layer / Router story is the same either way — once it clicks here, swapping in the real <code>http::Request&lt;Body&gt;</code> is a small change. Same trait, same <code>.call(req).await</code>, same wrapping. Only the field access (<code>req.name</code>) becomes a real extractor.</p>
+<hr>
+<h2 id="2-the-guard-loggingservice-and-logginglayer"><a class="header" href="#2-the-guard-loggingservice-and-logginglayer">2. The Guard: <code>LoggingService</code> and <code>LoggingLayer</code></a></h2>
+<p>The Guard is two pieces: the wrapper struct, and a tiny factory.</p>
+<h3 id="21-loggingservices--the-wrapper"><a class="header" href="#21-loggingservices--the-wrapper">2.1 <code>LoggingService&lt;S&gt;</code> — the wrapper</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct LoggingService&lt;S&gt; {
+    inner: S,                    // 'S' just stands for "Some Service"
+}
+
+// "For any LoggingService holding 'S', as long as 'S' is a Service..."
+impl&lt;S&gt; Service&lt;Request&gt; for LoggingService&lt;S&gt;
+where
+    S: Service&lt;Request&gt;,
+{
+    type Response = S::Response; // "...my response type is whatever 'S' returns."
+
+    async fn call(&amp;mut self, req: Request) -&gt; Result&lt;Self::Response, Error&gt; {
+        // 1. BEFORE — log the incoming request
+        println!("&gt;&gt;&gt; INCOMING REQUEST: {:?}", req);
+
+        // 2. PASS DOWN — hand the request to the inner worker
+        let response = self.inner.call(req).await;
+
+        // 3. AFTER — log the response
+        println!("&lt;&lt;&lt; OUTGOING RESPONSE: {:?}", response);
+
+        // 4. RETURN — give the response back
+        response
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>This is what middleware really is: a wrapper whose <code>call</code> runs <em>before</em> code, delegates to <code>inner</code>, then runs <em>after</em> code.</p>
+<h3 id="22-logginglayer--the-factory"><a class="header" href="#22-logginglayer--the-factory">2.2 <code>LoggingLayer</code> — the factory</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct LoggingLayer;   // empty marker — carries no data
+
+impl&lt;S&gt; Layer&lt;S&gt; for LoggingLayer {
+    type Service = LoggingService&lt;S&gt;;   // what the factory produces
+
+    fn layer(&amp;self, inner: S) -&gt; Self::Service {
+        LoggingService { inner: inner } // put the worker inside the box
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><code>LoggingLayer</code> is a tiny <strong>factory</strong>. The word “factory” here means exactly what it sounds like in everyday English: something whose only job is to <strong>build</strong> other things. It does not do the real work itself — it just produces the things that do the real work. Think <em>cookie cutter</em> (shapes dough into cookies; doesn’t eat them) or <em>gift-wrapping machine</em> (wraps a present; doesn’t deliver it).</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>What it is</th><th>Its job</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Worker</strong></td><td><code>LoggingService&lt;S&gt;</code></td><td><em>Runs</em> per request — logs request, calls <code>inner</code>, logs response.</td></tr>
+<tr><td><strong>Factory</strong></td><td><code>LoggingLayer</code></td><td><em>Produces</em> a <code>LoggingService</code>. Does no per-request work itself.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The factory has exactly one method (<code>fn layer</code>) and its entire body is <code>LoggingService { inner: inner }</code> — build one wrapped service, hand it back, done.</p>
+<p>So why is the factory separate from <code>LoggingService</code> itself? Because <code>Router</code> does not know what a <code>LoggingService</code> is — it only knows the <code>Layer</code> contract: <em>“give me an inner service, give me back a wrapped one.”</em> The factory is the <strong>adapter</strong> that lets the router build something it has never heard of. That is why every middleware in Tower needs <strong>two</strong> types: the <code>Service</code> (what runs per request) and the <code>Layer</code> (what tells the router how to build it).</p>
+<h3 id="23-the-two-pieces-visualized"><a class="header" href="#23-the-two-pieces-visualized">2.3 The two pieces, visualized</a></h3>
+<p>Once both pieces are in place, here is the picture of what each does and when:</p>
+<pre><code class="language-text">LoggingLayer  takes  ─►  some Service  (call it S)
+             returns ─►  LoggingService { inner: S }
+
+LoggingService::call  runs  ─►  BEFORE code
+                              │
+                              ▼  self.inner.call(req).await
+                              │  (runs S — could be Handler, Router, or another middleware)
+                              │
+                              ▼  AFTER code
+                              │
+                              ▼  return response
+</code></pre>
+<p>Read top to bottom:</p>
+<ul>
+<li><strong>Setup time</strong> (the top half) happens once, when you write <code>.layer(LoggingLayer)</code>. The factory takes some <code>S</code> and produces a <code>LoggingService</code> wrapped around it. After this, the factory’s job is done.</li>
+<li><strong>Request time</strong> (the bottom half) happens every time a request arrives. <code>LoggingService::call</code> runs the BEFORE code, hands the request to whatever <code>S</code> is via <code>self.inner.call(req).await</code>, then runs the AFTER code, and finally returns the response.</li>
+</ul>
+<p>The crucial detail in the middle: <code>S</code> is not necessarily a handler. It can be a <code>Handler</code>, a <code>Router</code>, or <strong>another middleware</strong> — anything that implements <code>Service&lt;Request&gt;</code>. That is what lets you stack middlewares like <code>.layer(AuthLayer).layer(LoggingLayer)</code>: each layer just sees “some inner Service” and does its thing around it.</p>
+<hr>
+<h2 id="3-the-dispatcher-router"><a class="header" href="#3-the-dispatcher-router">3. The Dispatcher: <code>Router</code></a></h2>
+<p>Conceptually, a router is just a map from path to service.</p>
+<h3 id="31-building-the-route-table"><a class="header" href="#31-building-the-route-table">3.1 Building the route table</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let app = Router::new()
+    .route("/hello", get(HelloHandler));
+<span class="boring">}</span></code></pre>
+<p>Step by step:</p>
+<ol>
+<li><code>Router::new()</code> creates an empty route table — think <code>HashMap&lt;Path, Box&lt;dyn Service&gt;&gt;</code>.</li>
+<li><code>get(HelloHandler)</code> wraps <code>HelloHandler</code> in a small adapter that only accepts the HTTP <code>GET</code> method. (A <code>POST /hello</code> will be rejected with <code>405 Method Not Allowed</code>.)</li>
+<li><code>.route("/hello", ...)</code> inserts the pair <code>("/hello", get(HelloHandler))</code> into the table.</li>
+</ol>
+<p>Conceptually:</p>
+<pre><code class="language-text">Router {
+    routes: { "/hello" =&gt; get(HelloHandler) }
+}
+</code></pre>
+<h3 id="32-the-radix-tree-not-a-flat-hashmap"><a class="header" href="#32-the-radix-tree-not-a-flat-hashmap">3.2 The radix tree (not a flat HashMap)</a></h3>
+<p>In reality, Axum does <strong>not</strong> use a plain <code>HashMap</code>. It uses a <strong>radix tree</strong> (a compressed prefix tree). This matters when you have many routes that share prefixes:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>.route("/users",           get(ListUsers))
+.route("/users/:id",       get(GetUser))
+.route("/users/:id/posts", get(GetUserPosts))
+<span class="boring">}</span></code></pre>
+<p>The tree shares <code>/users</code> once and branches:</p>
+<pre><code class="language-text">/users
+   |-- (end)              -&gt; ListUsers
+   |-- /:id
+        |-- (end)         -&gt; GetUser
+        |-- /posts        -&gt; GetUserPosts
+</code></pre>
+<p>Path parameters like <code>:id</code> are captured during the walk and handed to the handler as extracted arguments.</p>
+<h3 id="33-router-is-itself-a-service"><a class="header" href="#33-router-is-itself-a-service">3.3 <code>Router</code> is itself a <code>Service</code></a></h3>
+<p>When <code>GET /hello</code> arrives, the router does roughly:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>async fn call(&amp;mut self, req: Request) -&gt; Result&lt;Response, Error&gt; {
+    let path = req.uri().path();              // "/hello"
+    let service = self.routes.match_path(path)?;
+    service.call(req).await                   // delegate
+}
+<span class="boring">}</span></code></pre>
+<p>So <code>Router::call</code>’s entire job is <strong>look up, then delegate</strong>. The router is just another <code>Service</code>.</p>
+<hr>
+<h2 id="4-how-layerlogginglayer-wraps-the-router"><a class="header" href="#4-how-layerlogginglayer-wraps-the-router">4. How <code>.layer(LoggingLayer)</code> wraps the router</a></h2>
+<p>We have a router with a route, and we have a <code>LoggingLayer</code> factory. How does the wrapping actually happen?</p>
+<h3 id="41-the-simplest-possible-wrap-no-traits"><a class="header" href="#41-the-simplest-possible-wrap-no-traits">4.1 The simplest possible wrap (no traits)</a></h3>
+<p>Before we touch any trait machinery, here is the wrap done <strong>by hand</strong>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let handler = HelloHandler;
+let wrapped = LoggingService { inner: handler };
+//                            ^^^^^^^^^^^^^^^^^
+//                            this is the wrapping
+<span class="boring">}</span></code></pre>
+<p>That single line — <code>LoggingService { inner: handler }</code> — <strong>is</strong> the wrap. It is just struct construction: put <code>handler</code> into a field called <code>inner</code>. No magic.</p>
+<p>So why don’t we write that line directly in our app? Because we want the <strong>router</strong> to do it for us, automatically. But the router has never heard of <code>LoggingService</code>. It only knows the <code>Layer</code> contract:</p>
+<blockquote>
+<p>“Give me anything that implements <code>Layer</code>. I will hand you my inner service, and you must hand me back a wrapped version.”</p>
+</blockquote>
+<p>Look back at <code>LoggingLayer::layer</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn layer(&amp;self, inner: S) -&gt; Self::Service {
+    LoggingService { inner: inner }   // &lt;-- the same line as above!
+}
+<span class="boring">}</span></code></pre>
+<p>The body is literally the manual wrapping line. <strong>That is the only thing <code>LoggingLayer</code> does.</strong> It is a one-method type whose method is <code>LoggingService { inner }</code> and nothing else.</p>
+<h3 id="42-layerlogginglayer-triggers-the-wrapping"><a class="header" href="#42-layerlogginglayer-triggers-the-wrapping">4.2 <code>.layer(LoggingLayer)</code> triggers the wrapping</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let app = Router::new()
+    .route("/hello", get(HelloHandler))
+    .layer(LoggingLayer);
+<span class="boring">}</span></code></pre>
+<p>When <code>.layer(LoggingLayer)</code> runs, the router does this (pseudocode of <code>axum::Router::layer</code>):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl Router {
+    fn layer&lt;L: Layer&lt;Self&gt;&gt;(self, factory: L) -&gt; Router {
+        let wrapped = factory.layer(self);   // (1) factory wraps the router
+        Router::from_service(wrapped)        // (2) new router holds the wrap
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Step by step:</p>
+<ol>
+<li><code>factory.layer(self)</code> — the router hands <strong>itself</strong> to <code>LoggingLayer</code>’s <code>layer</code> method as <code>inner</code>.</li>
+<li>Inside that method, <code>LoggingService { inner: self }</code> runs — the router is placed inside a <code>LoggingService</code>.</li>
+<li>The <code>LoggingService { inner: router }</code> that pops out is bound to <code>wrapped</code>.</li>
+<li>A new router is built whose inner service is <code>wrapped</code>.</li>
+</ol>
+<p>After this line, <code>app</code> is conceptually:</p>
+<pre><code class="language-text">LoggingService { inner: Router { "/hello" =&gt; get(HelloHandler) } }
+</code></pre>
+<p>And the compiler now knows: <strong><code>S = Router</code></strong>. From here on, every place that said <code>S</code> will be replaced with <code>Router</code>.</p>
+<h3 id="43-two-methods-named-layer--keep-them-straight"><a class="header" href="#43-two-methods-named-layer--keep-them-straight">4.3 Two methods named <code>layer</code> — keep them straight</a></h3>
+<p>The wrapping involves <strong>two</strong> methods called <code>layer</code>. They share a name but live in different places, and one calls the other:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Where you see it</th><th>Whose method</th><th>What it does</th></tr>
+</thead>
+<tbody>
+<tr><td><code>.layer(LoggingLayer)</code> on a router</td><td><strong><code>Router::layer</code></strong> (inherent method)</td><td>Receives a factory, calls the factory, stores the result.</td></tr>
+<tr><td><code>factory.layer(self)</code> inside that body</td><td><strong><code>Layer::layer</code></strong> (trait method on <code>LoggingLayer</code>)</td><td>Returns <code>LoggingService { inner }</code>. The actual wrapping.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Read as English:</p>
+<blockquote>
+<p><strong>You → Router:</strong> “Router, please apply this factory to yourself.”
+<strong>Router → LoggingLayer:</strong> “Factory, here is the thing you should wrap.”
+<strong>LoggingLayer → Router:</strong> “Here is your service, wrapped: <code>LoggingService { inner: router }</code>.”</p>
+</blockquote>
+<hr>
+<h2 id="5-what-the-compiler-does-with-s-monomorphization"><a class="header" href="#5-what-the-compiler-does-with-s-monomorphization">5. What the compiler does with <code>S</code> (Monomorphization)</a></h2>
+<p>The trickiest piece of magic is the generic parameter <code>S</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct LoggingService&lt;S&gt; { inner: S }
+
+impl&lt;S&gt; Service&lt;Request&gt; for LoggingService&lt;S&gt;
+where
+    S: Service&lt;Request&gt;,
+{
+    type Response = S::Response;
+    ...
+}
+<span class="boring">}</span></code></pre>
+<p><code>S</code> is <strong>not a value</strong> at runtime. It is a placeholder the compiler fills in at <strong>compile time</strong>. This is called <strong>monomorphization</strong>: “mono” (one) + “morph” (form) — turning one generic blueprint into one concrete copy per concrete type used.</p>
+<h3 id="51-substitution"><a class="header" href="#51-substitution">5.1 Substitution</a></h3>
+<p>Now that <code>S = Router</code>, the compiler textually replaces every <code>S</code> in <code>LoggingService&lt;S&gt;</code> with <code>Router</code>. The code it actually compiles looks like this:</p>
+<p><strong>Your code:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct LoggingService&lt;S&gt; { inner: S }
+<span class="boring">}</span></code></pre>
+<p><strong>Compiler sees:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct LoggingService_Router { inner: Router }
+<span class="boring">}</span></code></pre>
+<p><strong>Your code:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl&lt;S&gt; Service&lt;Request&gt; for LoggingService&lt;S&gt;
+where
+    S: Service&lt;Request&gt;,
+{
+    type Response = S::Response;
+    ...
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Compiler sees:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl Service&lt;Request&gt; for LoggingService_Router {
+    type Response = Response;   // because Router::Response = Response
+    ...
+}
+<span class="boring">}</span></code></pre>
+<p>Two things just happened:</p>
+<ol>
+<li>The <code>where S: Service&lt;Request&gt;</code> clause is <strong>gone</strong>. The compiler already checked once that <code>Router</code> is a <code>Service&lt;Request&gt;</code>. After that the constraint has done its job; it does not exist at runtime.</li>
+<li><code>S::Response</code> was resolved to <code>Response</code>, because <code>Router::Response = Response</code>. The return type is now concrete.</li>
+</ol>
+<h3 id="52-the-fully-expanded-call-method"><a class="header" href="#52-the-fully-expanded-call-method">5.2 The fully expanded <code>call</code> method</a></h3>
+<p>This is the code that actually executes when a request arrives:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// What the compiler generates, conceptually:
+impl LoggingService_Router {
+    async fn call(&amp;mut self, req: Request) -&gt; Result&lt;Response, Error&gt; {
+        println!("&gt;&gt;&gt; INCOMING REQUEST: {:?}", req);
+
+        // self.inner is a Router, so this call is a *direct* call
+        // to Router::call — no virtual dispatch, no vtable, no boxing.
+        let response = self.inner.call(req).await;
+
+        println!("&lt;&lt;&lt; OUTGOING RESPONSE: {:?}", response);
+        response
+    }
+}
+<span class="boring">}</span></code></pre>
+<h3 id="53-why-this-matters-zero-cost-abstractions"><a class="header" href="#53-why-this-matters-zero-cost-abstractions">5.3 Why this matters (zero-cost abstractions)</a></h3>
+<ul>
+<li><strong>No runtime cost.</strong> <code>self.inner.call(req)</code> is a direct function call to <code>Router::call</code>. The CPU jumps straight there — no dictionary lookup, no <code>vtable</code>, no indirection.</li>
+<li><strong>No allocation.</strong> <code>LoggingService&lt;Router&gt;</code> is a plain struct with a <code>Router</code> field. It lives on the stack.</li>
+<li><strong>All checks happened at compile time.</strong> “Is <code>Router</code> actually a <code>Service</code>?” was answered before your binary was built. If you had passed something that was not a <code>Service</code>, the code would not have compiled.</li>
+</ul>
+<p>In JavaScript or Python, middleware is a list of functions the server loops through at runtime: <em>“What’s next? The logger. What’s next? The auth.”</em> That costs extra time and memory on every request. Rust’s compiler does all the matching, substituting, and verifying <em>before</em> your app runs. By compile time, <code>LoggingService</code> and <code>Router</code> are fused into one specific block of machine code. You get the beautiful chained code, and it runs as fast as if you had hand-written everything.</p>
+<hr>
+<h2 id="6-a-live-request-end-to-end"><a class="header" href="#6-a-live-request-end-to-end">6. A live request, end to end</a></h2>
+<p>Now boot the server and watch what happens when a user visits <code>http://localhost:3000/hello</code> with payload <code>{ name: "Alice" }</code>.</p>
+<h3 id="phase-1--the-request-arrives-the-guard"><a class="header" href="#phase-1--the-request-arrives-the-guard">Phase 1 — The Request Arrives (the Guard)</a></h3>
+<p><strong>1. The request hits the server.</strong> Axum receives the HTTP request. Because the <em>entire</em> router is wrapped in <code>LoggingService</code>, the request hits <code>LoggingService::call</code> first.</p>
+<blockquote>
+<p><em>“The Guard stops the incoming request at the front door.”</em></p>
+</blockquote>
+<p><strong>2. The Guard logs the request.</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>println!("&gt;&gt;&gt; INCOMING REQUEST: {:?}", req);
+<span class="boring">}</span></code></pre>
+<p>Terminal:</p>
+<pre><code class="language-text">&gt;&gt;&gt; INCOMING REQUEST: Request { method: GET, path: "/hello", name: "Alice" }
+</code></pre>
+<blockquote>
+<p><em>“The Guard writes the visitor’s details in the logbook.”</em></p>
+</blockquote>
+<p><strong>3. The Guard passes the request down.</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let response = self.inner.call(req).await;
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p><em>“The Guard hands the request to the inner service (the Router) and pauses to wait.”</em></p>
+</blockquote>
+<p>While suspended, the <code>LoggingService</code> task is <strong>parked</strong>. The Tokio runtime is free to work on other connections. A paused middleware is not a held thread — that is what makes Rust’s async middleware cheap.</p>
+<h3 id="phase-2--routing-the-dispatcher"><a class="header" href="#phase-2--routing-the-dispatcher">Phase 2 — Routing (the Dispatcher)</a></h3>
+<p><strong>4. The Router finds the destination.</strong> It takes the request, looks at the path <code>/hello</code>, walks the radix tree, finds <code>HelloHandler</code>.</p>
+<blockquote>
+<p><em>“The Dispatcher reads the envelope, sees <code>/hello</code>, walks it over to HelloHandler’s desk.”</em></p>
+</blockquote>
+<p><strong>5. The Worker does the job.</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>HelloHandler::call(&amp;mut self, req)
+    -&gt; Ok(format!("Hello, {}!", req.name))
+    -&gt; Ok("Hello, Alice!")
+<span class="boring">}</span></code></pre>
+<blockquote>
+<p><em>“HelloHandler reads ‘Alice’, creates ‘Hello, Alice!’, hands it back to the Router.”</em></p>
+</blockquote>
+<h3 id="phase-3--the-response-returns-the-guard"><a class="header" href="#phase-3--the-response-returns-the-guard">Phase 3 — The Response Returns (the Guard)</a></h3>
+<p><strong>6. The Router returns the result.</strong> Up the chain to whoever called it — the Guard.</p>
+<blockquote>
+<p><em>“The Dispatcher hands the finished work back to the Guard at the front door.”</em></p>
+</blockquote>
+<p><strong>7. The Guard logs the response.</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>println!("&lt;&lt;&lt; OUTGOING RESPONSE: {:?}", response);
+<span class="boring">}</span></code></pre>
+<p>Terminal:</p>
+<pre><code class="language-text">&lt;&lt;&lt; OUTGOING RESPONSE: Ok("Hello, Alice!")
+</code></pre>
+<blockquote>
+<p><em>“The Guard wakes back up (<code>.await</code> is finished), looks at the string, writes it in the logbook.”</em></p>
+</blockquote>
+<p><strong>8. The server responds to the user.</strong> The Guard hands <code>"Hello, Alice!"</code> back to Axum, which sends it across the internet to the user’s browser.</p>
+<h3 id="the-whole-trace"><a class="header" href="#the-whole-trace">The whole trace</a></h3>
+<p>Terminal:</p>
+<pre><code class="language-text">&gt;&gt;&gt; INCOMING REQUEST: Request { method: GET, path: "/hello", name: "Alice" }
+&lt;&lt;&lt; OUTGOING RESPONSE: Ok("Hello, Alice!")
+</code></pre>
+<p>Alice’s browser:</p>
+<pre><code class="language-text">Hello, Alice!
+</code></pre>
+<p>Call stack, unrolled:</p>
+<pre><code class="language-text">LoggingService::call    (BEFORE: log request)
+        |
+        v   self.inner.call(req).await
+Router::call            (lookup /hello)
+        |
+        v
+HelloHandler::call      (work: format "Hello, Alice!")
+        |   returns Ok("Hello, Alice!")
+        v   back up the chain
+Router::call            (returns)
+        |
+        v
+LoggingService::call    (AFTER: log response, return)
+        |
+        v
+Axum                    (serialize, write to socket)
+</code></pre>
+<hr>
+<h2 id="7-the-big-picture"><a class="header" href="#7-the-big-picture">7. The big picture</a></h2>
+<p>Three traits, three roles:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Trait</th><th>Role</th><th>What its <code>call</code> / <code>layer</code> does</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Service&lt;Request&gt;</code></td><td>The Worker</td><td>Takes a request, returns a response.</td></tr>
+<tr><td><code>Layer&lt;S&gt;</code></td><td>The Factory</td><td>Takes a service, returns a new service that wraps it.</td></tr>
+<tr><td><code>Router</code></td><td>The Dispatcher</td><td>Is itself a <code>Service</code>; its <code>call</code> looks up a path and delegates.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Three compile-time tricks that make it fast:</p>
+<ol>
+<li><strong>Monomorphization</strong> — generic <code>S</code> is replaced with a concrete type per use site, so every <code>call</code> becomes a direct function call.</li>
+<li><strong>No trait objects on the hot path</strong> — Axum’s tower stack is built from concrete types, so the entire middleware chain compiles to a flat sequence of inlined calls.</li>
+<li><strong>Async <code>.await</code> parks tasks, not threads</strong> — a middleware waiting on its inner service does not hold an OS thread, so thousands of in-flight requests share a small thread pool.</li>
+</ol>
+<p>The mental model:</p>
+<pre><code class="language-text">                      compile time                          run time
+┌────────────────────────────────────────┐    ┌──────────────────────────────────┐
+│ Router::new()                          │    │  request arrives                 │
+│   .route("/hello", get(HelloHandler))  │    │       │                          │
+│   .layer(LoggingLayer)                 │ -&gt; │       v                          │
+│                                        │    │  LoggingService::call (BEFORE)   │
+│ becomes                                │    │       │                          │
+│                                        │    │       v                          │
+│ LoggingService&lt;Router&gt; {               │    │  Router::call (lookup)           │
+│   inner: Router { "/hello" -&gt; Hello }  │    │       │                          │
+│ }                                      │    │       v                          │
+│                                        │    │  HelloHandler::call (work)       │
+│ — all generics resolved,               │    │       │                          │
+│   no vtables, no boxing.               │    │       v back up the chain        │
+└────────────────────────────────────────┘    │  LoggingService::call (AFTER)    │
+                                              │       │                          │
+                                              │       v                          │
+                                              │  response sent to client         │
+                                              └──────────────────────────────────┘
+</code></pre>
+<p>Layers stack at build time, the compiler fuses them into one optimized type, and at request time each <code>.call(...).await</code> is just a direct function call that may park the task while it waits for the inner service to finish.</p>
+<hr>
+<h2 id="appendix--the-full-code-in-one-place"><a class="header" href="#appendix--the-full-code-in-one-place">Appendix — the full code in one place</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct HelloHandler;
+
+impl Service&lt;Request&gt; for HelloHandler {
+    type Response = String;
+
+    async fn call(&amp;mut self, req: Request) -&gt; Result&lt;String, Error&gt; {
+        Ok(format!("Hello, {}!", req.name))
+    }
+}
+
+struct LoggingService&lt;S&gt; {
+    inner: S,
+}
+
+impl&lt;S&gt; Service&lt;Request&gt; for LoggingService&lt;S&gt;
+where
+    S: Service&lt;Request&gt;,
+{
+    type Response = S::Response;
+
+    async fn call(&amp;mut self, req: Request) -&gt; Result&lt;Self::Response, Error&gt; {
+        println!("&gt;&gt;&gt; INCOMING REQUEST: {:?}", req);
+        let response = self.inner.call(req).await;
+        println!("&lt;&lt;&lt; OUTGOING RESPONSE: {:?}", response);
+        response
+    }
+}
+
+struct LoggingLayer;
+
+impl&lt;S&gt; Layer&lt;S&gt; for LoggingLayer {
+    type Service = LoggingService&lt;S&gt;;
+
+    fn layer(&amp;self, inner: S) -&gt; Self::Service {
+        LoggingService { inner: inner }
+    }
+}
+
+// One layer wraps the whole router, so logging applies to every route below.
+let app = Router::new()
+    .route("/users",    get(UserHandler))
+    .route("/posts",    get(PostHandler))
+    .route("/comments", get(CommentHandler))
+    .layer(LoggingLayer);
+<span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="serde"><a class="header" href="#serde">serde</a></h1>
+<p>Serde is a framework for <strong>serializing</strong> and <strong>deserializing</strong> Rust data structures.</p>
+<ul>
+<li><strong>Serialize</strong> = turn a Rust value into bytes you can send/store (<code>User { name: "Alice" }</code> → <code>{"name":"Alice"}</code>).</li>
+<li><strong>Deserialize</strong> = the reverse (<code>{"name":"Alice"}</code> → <code>User { name: "Alice" }</code>).</li>
+</ul>
+<p>The clever part of serde is <strong>how</strong> it does this. It does not say: “here is a JSON-to-struct converter, here is a YAML-to-struct converter, here is a TOML-to-struct converter…” That would be one converter per (format × type) pair, which explodes the moment you have many of either.</p>
+<p>Instead, serde inserts a small <strong>middle world</strong> that both sides know how to talk to. The shape of the architecture is exactly the diagram:</p>
+<pre><code class="language-text">   ┌──────────┐         ┌──────────┐         ┌──────────┐
+   │  Rust    │         │  serde   │         │  bytes   │
+   │  type    │ ─────►  │   data   │ ─────►  │  in some │
+   │          │         │  model   │         │  format  │
+   │          │ ◄─────  │          │ ◄─────  │          │
+   └──────────┘         └──────────┘         └──────────┘
+        ▲                    ▲                    ▲
+        │                    │                    │
+   Serialize /          ~29 primitive       Serializer /
+   Deserialize             "shapes"          Deserializer
+   live on the type     (bool, i32, str,    live on the format
+                         seq, map, struct…)
+</code></pre>
+<p>Before we look at any code, let’s nail down what each of the five labels actually means.</p>
+<hr>
+<h2 id="1-data-type"><a class="header" href="#1-data-type">1. Data type</a></h2>
+<p>A <strong>data type</strong> is a concrete Rust type <em>you</em> define for <em>your</em> program.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct User {
+    name: String,
+    age: u32,
+    emails: Vec&lt;String&gt;,
+}
+<span class="boring">}</span></code></pre>
+<p><code>User</code> only exists in your code. It has fields, lifetimes, ownership rules — all the Rust-specific machinery. A JSON file has never heard of <code>User</code>, and <code>User</code> has never heard of JSON.</p>
+<p>“Data type” here means “whatever Rust type you happen to have today” — <code>User</code>, <code>Config</code>, <code>Vec&lt;Order&gt;</code>, <code>HashMap&lt;String, i64&gt;</code>, whatever. Every program has its own zoo of these.</p>
+<hr>
+<h2 id="2-data-format"><a class="header" href="#2-data-format">2. Data format</a></h2>
+<p>A <strong>data format</strong> is the byte-level encoding you want to read from or write to.</p>
+<ul>
+<li>JSON: <code>{"name":"Alice","age":30}</code></li>
+<li>YAML: <code>name: Alice\nage: 30</code></li>
+<li>TOML: <code>name = "Alice"\nage = 30</code></li>
+<li>bincode: a compact binary blob — not human-readable.</li>
+<li>MessagePack, CBOR, RON, XML, … the list is long.</li>
+</ul>
+<p>A format is just a <em>convention about bytes</em>: which characters mean “start of object”, how strings are quoted, whether numbers are decimal or binary, etc. It has no idea what a <code>User</code> is either — it only knows how to encode generic things like “a string”, “an integer”, “a list of stuff”, “a key/value object”.</p>
+<p>“Data format” stands for “whatever encoding you happen to need today”. Every program might support several of them.</p>
+<hr>
+<h2 id="3-data-model"><a class="header" href="#3-data-model">3. Data model</a></h2>
+<p>This is the key invention. The <strong>serde data model</strong> is a small, fixed vocabulary that sits in the middle and that <em>both sides agree on</em>.</p>
+<p>It is a list of about 29 primitive “shapes” that any data can be described in terms of. The big ones:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Category</th><th>Members</th></tr>
+</thead>
+<tbody>
+<tr><td>Booleans</td><td><code>bool</code></td></tr>
+<tr><td>Integers</td><td><code>i8 i16 i32 i64 i128</code>, <code>u8 u16 u32 u64 u128</code></td></tr>
+<tr><td>Floats</td><td><code>f32 f64</code></td></tr>
+<tr><td>Text</td><td><code>char</code>, <code>str</code></td></tr>
+<tr><td>Bytes</td><td><code>bytes</code></td></tr>
+<tr><td>Optionals</td><td><code>none</code>, <code>some</code></td></tr>
+<tr><td>Unit-ish</td><td><code>unit</code>, <code>unit_struct</code>, <code>unit_variant</code></td></tr>
+<tr><td>Newtypes</td><td><code>newtype_struct</code>, <code>newtype_variant</code></td></tr>
+<tr><td>Sequences</td><td><code>seq</code>, <code>tuple</code>, <code>tuple_struct</code>, <code>tuple_variant</code></td></tr>
+<tr><td>Maps &amp; structs</td><td><code>map</code>, <code>struct</code>, <code>struct_variant</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>That is <strong>it</strong>. Every Rust type, no matter how exotic, is described to serde as some combination of those shapes. Every format, no matter how exotic, is told to write some combination of those shapes.</p>
+<p>The data model is the <strong>shared language</strong>. Neither side speaks the other’s tongue, but both speak “model”.</p>
+<pre><code class="language-text">            ┌──────────────────────┐
+  Rust type ├──► "this is a struct │   ─►  JSON  writer
+            │     with 2 fields:   │
+            │     name: str,       │   ─►  YAML  writer
+            │     age: u32"        │
+            └──────────────────────┘   ─►  bincode writer
+                  the data model
+</code></pre>
+<p>Why is this a win? Because of the N + M vs. N × M math:</p>
+<ul>
+<li>Without the model: every Rust type would need to know how to write itself to <em>every</em> format. 100 types × 10 formats = 1000 hand-written converters.</li>
+<li>With the model: each type only learns to talk to the model (100 implementations), and each format only learns to talk to the model (10 implementations). Total: 110.</li>
+</ul>
+<p>You only ever cross <strong>one</strong> edge at a time. Type ↔ model, then model ↔ format.</p>
+<hr>
+<h2 id="4-serialize--the-trait-on-the-data-type"><a class="header" href="#4-serialize--the-trait-on-the-data-type">4. Serialize — the trait on the data type</a></h2>
+<p><code>Serialize</code> is a trait that lives on your data type. Implementing it is how the data type learns to describe itself in terms of the data model.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// simplified
+pub trait Serialize {
+    fn serialize&lt;S: Serializer&gt;(&amp;self, serializer: S) -&gt; Result&lt;S::Ok, S::Error&gt;;
+}
+<span class="boring">}</span></code></pre>
+<p>Read the method out loud: <em>“Given some serializer, describe myself to it.”</em></p>
+<p>A <code>Serialize</code> impl for <code>User</code> says, in effect:</p>
+<blockquote>
+<p>“I am a <strong>struct</strong> called <code>User</code> with <strong>3 fields</strong>: <code>name</code> is a string, <code>age</code> is a u32, <code>emails</code> is a sequence of strings.”</p>
+</blockquote>
+<p>It does <strong>not</strong> say “write <code>{</code>, then write <code>"name":</code>, then write <code>"Alice"</code>”. It never mentions JSON, never mentions YAML. It only ever mentions data-model words like <code>struct</code>, <code>field</code>, <code>str</code>, <code>u32</code>, <code>seq</code>.</p>
+<p>In practice you almost never write this by hand — you derive it:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use serde::Serialize;
+
+#[derive(Serialize)]
+struct User {
+    name: String,
+    age: u32,
+    emails: Vec&lt;String&gt;,
+}
+<span class="boring">}</span></code></pre>
+<p>The macro generates the impl for you. Either way, the result is the same: a method that walks the type and describes it to whichever serializer it is handed. <strong><code>Deserialize</code></strong> is the mirror trait — <em>“given some deserializer, build me from it.”</em></p>
+<hr>
+<h2 id="5-serializer--the-trait-on-the-format"><a class="header" href="#5-serializer--the-trait-on-the-format">5. Serializer — the trait on the format</a></h2>
+<p><code>Serializer</code> is a trait that lives on the <strong>format side</strong>. Implementing it is how the format learns to turn data-model words into bytes.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// extremely simplified
+pub trait Serializer {
+    fn serialize_bool(self, v: bool)   -&gt; Result&lt;Self::Ok, Self::Error&gt;;
+    fn serialize_i32(self, v: i32)     -&gt; Result&lt;Self::Ok, Self::Error&gt;;
+    fn serialize_str(self, v: &amp;str)    -&gt; Result&lt;Self::Ok, Self::Error&gt;;
+    fn serialize_struct(self, name: &amp;'static str, len: usize) -&gt; ...;
+    fn serialize_seq(self, len: Option&lt;usize&gt;) -&gt; ...;
+    // ... ~29 methods, one per data-model shape
+}
+<span class="boring">}</span></code></pre>
+<p>A format crate like <code>serde_json</code> provides a struct (e.g. <code>JsonSerializer</code>) that implements every one of these methods by writing JSON bytes:</p>
+<ul>
+<li><code>serialize_bool(true)</code> → write <code>true</code></li>
+<li><code>serialize_str("Alice")</code> → write <code>"Alice"</code> (with quotes and escapes)</li>
+<li><code>serialize_struct("User", 3)</code> → write <code>{</code>, remember to write <code>}</code> at the end</li>
+<li><code>serialize_seq(Some(2))</code> → write <code>[</code>, remember to write <code>]</code> at the end</li>
+</ul>
+<p>A different format crate like <code>bincode</code> provides its own struct that implements the <em>same</em> methods but writes a compact binary form instead. <strong><code>Deserializer</code></strong> is the mirror trait — it reads bytes and <em>calls back</em> into the type’s <code>Deserialize</code> impl, telling it “I just read a string”, “I just read the start of a map”, etc.</p>
+<p>The serializer is what turns “I am a struct with 3 fields” into actual <code>{"name":"Alice","age":30,"emails":[...]}</code> bytes.</p>
+<hr>
+<h2 id="putting-the-five-together"><a class="header" href="#putting-the-five-together">Putting the five together</a></h2>
+<p>The moment of conversion looks like this:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let user = User { name: "Alice".into(), age: 30, emails: vec![] };
+let json = serde_json::to_string(&amp;user)?;     // "{\"name\":\"Alice\",...}"
+<span class="boring">}</span></code></pre>
+<p>What actually happens under the hood, in slow motion:</p>
+<pre><code class="language-text">1. serde_json::to_string  builds a  JsonSerializer  (a Serializer impl).
+2. It calls  user.serialize(json_serializer).
+3. The derived Serialize impl on User says, in model words:
+       "serializer, I am a struct called 'User' with 3 fields."
+       "field 'name' is a str: 'Alice'"
+       "field 'age'  is a u32: 30"
+       "field 'emails' is a seq of str: []"
+4. Each of those calls hits a method on JsonSerializer, which writes
+   the matching JSON bytes into a buffer.
+5. The buffer is returned as a String.
+</code></pre>
+<p>Notice what was <strong>not</strong> in that pipeline:</p>
+<ul>
+<li><code>User</code> never saw a <code>{</code> or a <code>"</code>.</li>
+<li><code>JsonSerializer</code> never saw the name <code>User</code> until step 3 told it.</li>
+<li>Neither side imported the other.</li>
+</ul>
+<p>Swap <code>serde_json</code> for <code>serde_yaml</code> and step 1 builds a <code>YamlSerializer</code> instead. <strong>Steps 2 and 3 do not change at all</strong> — your <code>User</code> still describes itself in the same model words; it is just that a different listener is now translating those words into different bytes.</p>
+<p>That is the whole magic. The five pieces lock together like this:</p>
+<pre><code class="language-text">   data type    ──Serialize──►   data model   ──Serializer──►   data format
+                 (trait on                     (trait on
+                  your type)                    the format)
+</code></pre>
+<p>Each arrow is exactly one trait. Each trait crosses exactly one edge of the diagram. Hold on to that picture — every deeper topic in serde (visitors, <code>Deserializer</code> lifetimes, zero-copy, format-specific attributes, custom impls) is just zooming into one of these arrows.</p>
+<h3 id="one-type-two-formats-meeting-in-the-middle"><a class="header" href="#one-type-two-formats-meeting-in-the-middle">One type, two formats, meeting in the middle</a></h3>
+<p>The real serde <code>Serializer</code> trait has about 29 methods (one per data-model word) which is too much to show all at once. So for this example, let’s pretend serde is much smaller — its data-model vocabulary has only <strong>3 words</strong>: <em>“start a struct”</em>, <em>“here is an i32 field”</em>, <em>“end the struct”</em>. That is enough to handle our <code>Point</code>.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// PRETEND SERDE — a tiny stand-in for the real Serializer trait.
+// The "data-model vocabulary" is just these three methods.
+trait MiniSerializer {
+    fn start_struct(&amp;mut self, name: &amp;'static str);
+    fn field_i32(&amp;mut self, key: &amp;'static str, value: i32);
+    fn end_struct(&amp;mut self);
+}
+<span class="boring">}</span></code></pre>
+<p>Now <strong>one data type</strong> that only knows how to describe itself in those three words:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// THE DATA TYPE — never mentions any format.
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn serialize&lt;S: MiniSerializer&gt;(&amp;self, s: &amp;mut S) {
+        s.start_struct("Point");          // model word 1
+        s.field_i32("x", self.x);         // model word 2
+        s.field_i32("y", self.y);         // model word 2
+        s.end_struct();                   // model word 3
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Now <strong>two formats</strong> that only know how to turn those three words into bytes:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// FORMAT A — writes "(x=1, y=2)". Never mentions Point.
+struct ParenWriter { buf: String, first: bool }
+
+impl MiniSerializer for ParenWriter {
+    fn start_struct(&amp;mut self, _name: &amp;'static str) {
+        self.buf.push('(');
+        self.first = true;
+    }
+    fn field_i32(&amp;mut self, key: &amp;'static str, value: i32) {
+        if !self.first { self.buf.push_str(", "); }
+        self.first = false;
+        self.buf.push_str(key);            // "x"
+        self.buf.push('=');                // "="
+        self.buf.push_str(&amp;value.to_string());  // "1"
+    }
+    fn end_struct(&amp;mut self) {
+        self.buf.push(')');
+    }
+}
+<span class="boring">}</span></code></pre>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// FORMAT B — writes "1,2". Never mentions Point either.
+struct CsvWriter { buf: String, first: bool }
+
+impl MiniSerializer for CsvWriter {
+    fn start_struct(&amp;mut self, _name: &amp;'static str) {
+        self.first = true;                 // nothing to open
+    }
+    fn field_i32(&amp;mut self, _key: &amp;'static str, value: i32) {
+        if !self.first { self.buf.push(','); }
+        self.first = false;
+        self.buf.push_str(&amp;value.to_string());  // CSV ignores the key
+    }
+    fn end_struct(&amp;mut self) {
+        // nothing to close
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Notice that <strong>each format makes different choices for the same three model words</strong>: <code>ParenWriter::start_struct</code> opens a <code>(</code>, while <code>CsvWriter::start_struct</code> writes nothing. <code>ParenWriter::field_i32</code> uses the key (<code>"x="</code>), while <code>CsvWriter::field_i32</code> discards it. Same vocabulary, different bytes.</p>
+<p>Now the meeting:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let p = Point { x: 1, y: 2 };
+
+let mut a = ParenWriter { buf: String::new(), first: true };
+p.serialize(&amp;mut a);
+// a.buf == "(x=1, y=2)"
+
+let mut b = CsvWriter { buf: String::new(), first: true };
+p.serialize(&amp;mut b);
+// b.buf == "1,2"
+<span class="boring">}</span></code></pre>
+<p>Trace the first call in your head: <code>p.serialize(&amp;mut a)</code> runs the <strong>one</strong> <code>Point::serialize</code> body. Line 1 calls <code>a.start_struct("Point")</code> → <code>a.buf</code> is now <code>"("</code>. Line 2 calls <code>a.field_i32("x", 1)</code> → <code>a.buf</code> is now <code>"(x=1"</code>. Line 3 calls <code>a.field_i32("y", 2)</code> → <code>a.buf</code> is now <code>"(x=1, y=2"</code>. Line 4 calls <code>a.end_struct()</code> → <code>a.buf</code> is now <code>"(x=1, y=2)"</code>. The second call is identical except the methods belong to <code>CsvWriter</code>, so different bytes come out.</p>
+<p>Three things to notice — they are the whole point:</p>
+<ol>
+<li><strong><code>Point::serialize</code> was written once.</strong> The exact same method body ran in both calls. It never mentions <code>ParenWriter</code> or <code>CsvWriter</code>, never imports them, never knows what bytes will appear.</li>
+<li><strong><code>ParenWriter</code> and <code>CsvWriter</code> were written without ever importing <code>Point</code>.</strong> They only know what to do when handed the three model words. They don’t care that those words happened to describe a <code>Point</code> this time — anything that calls <code>start_struct</code> / <code>field_i32</code> / <code>end_struct</code> would work.</li>
+<li><strong>The meeting happens directly at <code>.serialize(&amp;mut a)</code> and <code>.serialize(&amp;mut b)</code>.</strong> No translator sits between them. Both sides agreed on the same three-word vocabulary, so the conversation just works.</li>
+</ol>
+<p>Now add one more type — say <code>struct Color { r: i32, g: i32, b: i32 }</code> with its own <code>serialize</code> method that calls the same three model words — and <strong>both writers handle it for free</strong>, with zero changes to either format’s code. Add one more format — say an <code>XmlWriter</code> that turns the same three words into <code>&lt;Point&gt;&lt;x&gt;1&lt;/x&gt;&lt;y&gt;2&lt;/y&gt;&lt;/Point&gt;</code> — and <strong><code>Point</code> and <code>Color</code> both work with it for free</strong>, with zero changes to either type’s code.</p>
+<p>That is N + M, not N × M, in concrete form. Real serde works exactly the same way; it just has 29 model words instead of 3, which is enough to describe every Rust type you will ever want to serialize.</p>
+<h3 id="the-other-direction-two-formats-one-type-meeting-in-the-middle"><a class="header" href="#the-other-direction-two-formats-one-type-meeting-in-the-middle">The other direction: two formats, one type, meeting in the middle</a></h3>
+<p>Deserializing is the mirror image. Bytes already exist in some format, and we want to <strong>end up with a <code>Point</code></strong>. The three model words flip direction: instead of the type <em>telling</em> the format “here is a struct-start, here is an i32 field, here is a struct-end”, the format <strong>answers</strong> when the type asks for them.</p>
+<p>Same trick, same vocabulary, played backwards. Our pretend data-model still has three words, but now each one is a question the type asks and the format answers:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// PRETEND SERDE — mirror of MiniSerializer. The format does the parsing
+// and just hands back primitive values when asked.
+trait MiniDeserializer {
+    fn start_struct(&amp;mut self);
+    fn field_i32(&amp;mut self, key: &amp;'static str) -&gt; i32;
+    fn end_struct(&amp;mut self);
+}
+<span class="boring">}</span></code></pre>
+<p>The data type now learns to <strong>build itself</strong> from those three words — it asks for what it needs in order, and trusts the deserializer to deliver an <code>i32</code> when prompted:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// THE DATA TYPE — still never mentions any format.
+impl Point {
+    fn deserialize&lt;D: MiniDeserializer&gt;(d: &amp;mut D) -&gt; Point {
+        d.start_struct();                  // model word 1
+        let x = d.field_i32("x");          // model word 2
+        let y = d.field_i32("y");          // model word 2
+        d.end_struct();                    // model word 3
+        Point { x, y }
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Two formats that know how to chew through bytes and answer those three questions:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// FORMAT A — parses "(x=1, y=2)". Never mentions Point.
+struct ParenReader&lt;'a&gt; { input: &amp;'a str, pos: usize }
+
+impl&lt;'a&gt; MiniDeserializer for ParenReader&lt;'a&gt; {
+    fn start_struct(&amp;mut self) {
+        self.pos += 1;                     // skip the opening '('
+    }
+    fn field_i32(&amp;mut self, key: &amp;'static str) -&gt; i32 {
+        if self.input.as_bytes()[self.pos] == b',' {
+            self.pos += 2;                 // skip ", " between fields
+        }
+        self.pos += key.len() + 1;         // skip the key and '='
+        let start = self.pos;
+        while self.pos &lt; self.input.len()
+            &amp;&amp; self.input.as_bytes()[self.pos].is_ascii_digit()
+        {
+            self.pos += 1;
+        }
+        self.input[start..self.pos].parse().unwrap()
+    }
+    fn end_struct(&amp;mut self) {
+        self.pos += 1;                     // skip ')'
+    }
+}
+<span class="boring">}</span></code></pre>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// FORMAT B — parses "1,2". Never mentions Point either.
+struct CsvReader&lt;'a&gt; { input: &amp;'a str, pos: usize }
+
+impl&lt;'a&gt; MiniDeserializer for CsvReader&lt;'a&gt; {
+    fn start_struct(&amp;mut self) {
+        // nothing to open
+    }
+    fn field_i32(&amp;mut self, _key: &amp;'static str) -&gt; i32 {
+        if self.pos &gt; 0 &amp;&amp; self.input.as_bytes()[self.pos] == b',' {
+            self.pos += 1;                 // skip ',' between fields
+        }
+        let start = self.pos;
+        while self.pos &lt; self.input.len()
+            &amp;&amp; self.input.as_bytes()[self.pos].is_ascii_digit()
+        {
+            self.pos += 1;
+        }
+        self.input[start..self.pos].parse().unwrap()  // CSV ignored the key
+    }
+    fn end_struct(&amp;mut self) {
+        // nothing to close
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Same role-reversal as before: <strong>each format makes different choices for the same three model words</strong>. <code>ParenReader::start_struct</code> eats a <code>(</code>, while <code>CsvReader::start_struct</code> eats nothing. <code>ParenReader::field_i32</code> reads past the key (<code>"x="</code>), while <code>CsvReader::field_i32</code> discards it. Same vocabulary, different bytes.</p>
+<p>Now the meeting:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut a = ParenReader { input: "(x=1, y=2)", pos: 0 };
+let p1 = Point::deserialize(&amp;mut a);
+// p1 == Point { x: 1, y: 2 }
+
+let mut b = CsvReader { input: "1,2", pos: 0 };
+let p2 = Point::deserialize(&amp;mut b);
+// p2 == Point { x: 1, y: 2 }
+<span class="boring">}</span></code></pre>
+<p>Trace the first call: <code>Point::deserialize(&amp;mut a)</code> runs the <strong>one</strong> body. <code>a.start_struct()</code> consumes <code>(</code>. <code>a.field_i32("x")</code> skips past <code>x=</code>, reads <code>1</code>, returns <code>1</code>. <code>a.field_i32("y")</code> skips past <code>, y=</code>, reads <code>2</code>, returns <code>2</code>. <code>a.end_struct()</code> consumes <code>)</code>. The returned <code>Point { x: 1, y: 2 }</code> is bit-for-bit identical to what falls out of <code>CsvReader</code> parsing <code>"1,2"</code> — completely different bytes, completely different parsing logic, <strong>same struct at the end</strong>.</p>
+<p>The same three observations apply, mirrored:</p>
+<ol>
+<li><strong><code>Point::deserialize</code> was written once.</strong> The exact same method body ran in both calls. It never mentions <code>ParenReader</code> or <code>CsvReader</code>, and has no idea what bytes were on disk.</li>
+<li><strong><code>ParenReader</code> and <code>CsvReader</code> were written without ever importing <code>Point</code>.</strong> They only know how to answer the three model questions. Anything that calls <code>start_struct</code> / <code>field_i32</code> / <code>end_struct</code> in the right order would work — <code>Color</code> from earlier would deserialize for free.</li>
+<li><strong>The meeting happens directly at <code>Point::deserialize(&amp;mut a)</code> and <code>Point::deserialize(&amp;mut b)</code>.</strong> Both sides agreed on the same three-word vocabulary; the conversation just runs backwards now.</li>
+</ol>
+<p>So the full picture is symmetric:</p>
+<pre><code class="language-text">   data type   ◄──Deserialize──   data model   ◄──Deserializer──   data format
+                (trait on                       (trait on
+                 your type)                      the format)
+</code></pre>
+<p>Serialization walks left-to-right; deserialization walks right-to-left. The middle world — the data model with its ~29 words — is the same in both directions. That is why <code>#[derive(Serialize, Deserialize)]</code> gives you both for free: same vocabulary, played in opposite directions.</p>
+<p>In the next sections we will do the zooming, one arrow at a time.</p>
 
                     </main>
 
