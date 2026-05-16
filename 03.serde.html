@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-35c9240a.js";
+            window.path_to_searchindex_js = "searchindex-c84ac1b2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-83f4a4ad.js"></script>
@@ -358,6 +358,13 @@ trait MiniSerializer {
     fn end_struct(&amp;mut self);
 }
 <span class="boring">}</span></code></pre>
+<p>Hold this picture in your head — it is the whole trick:</p>
+<ul>
+<li>The <strong>trait definition</strong> <em>is</em> the data-model vocabulary. A fixed contract that both sides agree on.</li>
+<li>The data <strong>type</strong> <em>uses</em> the vocabulary: it calls the methods in the right order to describe itself. It does not care who is on the other end.</li>
+<li>The data <strong>format</strong> <em>implements</em> the vocabulary: each method body decides what bytes to produce for that model word. It does not care who called it.</li>
+</ul>
+<p>So in Rust terms: the trait is the model, calling its methods is the type’s job, providing the <code>impl</code> is the format’s job. Neither side imports the other — they only meet through the trait. That is N + M in one sentence: <strong>the vocabulary is shared, the calling side and the implementing side are independent</strong>.</p>
 <p>Now <strong>one data type</strong> that only knows how to describe itself in those three words:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -547,7 +554,289 @@ let p2 = Point::deserialize(&amp;mut b);
                  your type)                      the format)
 </code></pre>
 <p>Serialization walks left-to-right; deserialization walks right-to-left. The middle world — the data model with its ~29 words — is the same in both directions. That is why <code>#[derive(Serialize, Deserialize)]</code> gives you both for free: same vocabulary, played in opposite directions.</p>
+<h3 id="a-confession-about-the-example"><a class="header" href="#a-confession-about-the-example">A confession about the example</a></h3>
+<p>Both examples above were kept deliberately tiny, and that hides an important asymmetry between the two sides. On purpose, every reader and writer assumed the type’s fields were exactly <code>x</code> and <code>y</code>.</p>
+<p>The serializer side is honest: <code>ParenWriter::field_i32</code> actually uses the key it is handed (<code>self.buf.push_str(key)</code>), so renaming <code>Point</code>’s fields to anything else would still produce correct output. Writing a key is trivial — you print the string you were given.</p>
+<p>The deserializer side is fudged. <code>ParenReader::field_i32</code> doesn’t really <em>read</em> the key from the input — it just blindly skips <code>key.len() + 1</code> bytes and trusts that the digit it finds belongs to whichever field the type asked for. It only works because:</p>
+<ul>
+<li>The fields in the input appear in the same order the type expects (<code>x</code> then <code>y</code>).</li>
+<li>The keys in the input happen to have the same length as the keys the type asks for.</li>
+</ul>
+<p>Rename to <code>name</code> / <code>value</code> and the parser walks off into the weeds. Reorder the input to <code>(y=2, x=1)</code> and the values come out swapped.</p>
+<p>The reason is structural: <strong>writing a key is easy, reading a key is real work</strong> — you have to parse bytes, decide which field they correspond to, and cope with fields appearing in any order, missing fields, unknown fields, aliases, and so on. The mini deserializer sidestepped all of that by pretending the type’s expected order <em>was</em> the input’s order.</p>
+<p>That asymmetry — easy to push, hard to pull — is exactly why real serde introduces one more concept on the deserialization side: the <strong>Visitor</strong>.</p>
+<h3 id="the-visitor-who-decides-what-each-piece-means"><a class="header" href="#the-visitor-who-decides-what-each-piece-means">The Visitor: who decides what each piece means</a></h3>
+<p>In the mini example, <code>Point::deserialize</code> was in charge of asking for things in order:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>d.start_struct();
+let x = d.field_i32("x");   // "give me x next"
+let y = d.field_i32("y");   // "give me y next"
+<span class="boring">}</span></code></pre>
+<p>The format had to play along. That works for our toy, but it breaks the moment the input doesn’t appear in the type’s preferred order.</p>
+<p>Real serde flips the protocol. The <strong>format</strong> drives the loop, reading whatever happens to be next in the bytes. The <strong>type</strong> hands the deserializer a small helper — a <code>Visitor</code> — that says: “if you find an i32 with key <code>x</code>, do this; if you find one with key <code>y</code>, do that; if you find something I don’t recognize, here’s what to do.” The deserializer calls back into the visitor for each thing it parses.</p>
+<p>Picture three pieces instead of two:</p>
+<pre><code class="language-text">   data type  ──provides──►   Visitor   ◄──drives──   Deserializer
+   (Point)                  (PointVisitor)            (ParenReader)
+</code></pre>
+<p>Our mini world with a visitor would look like:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// The deserializer no longer answers "give me x". It loops over the
+// bytes and calls back into a visitor for each thing it finds.
+trait Visitor {
+    fn visit_i32_field(&amp;mut self, key: &amp;str, value: i32);
+}
+
+trait MiniDeserializer {
+    fn deserialize_struct&lt;V: Visitor&gt;(&amp;mut self, visitor: &amp;mut V);
+}
+<span class="boring">}</span></code></pre>
+<p>The type provides its own visitor — a temporary collector that knows how to absorb each field by key:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// THE TYPE — builds itself piece by piece as the visitor is called.
+struct PointVisitor { x: Option&lt;i32&gt;, y: Option&lt;i32&gt; }
+
+impl Visitor for PointVisitor {
+    fn visit_i32_field(&amp;mut self, key: &amp;str, value: i32) {
+        match key {
+            "x" =&gt; self.x = Some(value),
+            "y" =&gt; self.y = Some(value),
+            _   =&gt; { /* unknown field — ignore */ }
+        }
+    }
+}
+
+impl Point {
+    fn deserialize&lt;D: MiniDeserializer&gt;(d: &amp;mut D) -&gt; Point {
+        let mut v = PointVisitor { x: None, y: None };
+        d.deserialize_struct(&amp;mut v);
+        Point { x: v.x.unwrap(), y: v.y.unwrap() }
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Now the format genuinely reads keys from the bytes and tells the visitor what it found:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl&lt;'a&gt; MiniDeserializer for ParenReader&lt;'a&gt; {
+    fn deserialize_struct&lt;V: Visitor&gt;(&amp;mut self, v: &amp;mut V) {
+        self.pos += 1;                       // skip '('
+        loop {
+            let key = self.read_key();       // parse "x", "y", or anything else
+            self.pos += 1;                   // skip '='
+            let value = self.read_i32();     // parse digits
+            v.visit_i32_field(&amp;key, value);  // hand it to the type
+            if self.peek() == b')' { break; }
+            self.pos += 2;                   // skip ", "
+        }
+        self.pos += 1;                       // skip ')'
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Three things change:</p>
+<ol>
+<li><strong>Order no longer matters.</strong> <code>(y=2, x=1)</code> works because the visitor matches on the key, not the position.</li>
+<li><strong>Renaming fields just works.</strong> Change <code>Point</code> to use <code>name</code> / <code>value</code> and update <code>PointVisitor</code>’s <code>match</code>. The reader is untouched — it parses whatever key happens to be there.</li>
+<li><strong>Unknown fields can be handled gracefully</strong> (ignored, errored, collected) instead of corrupting the parse.</li>
+</ol>
+<p>The cost is one extra concept (the visitor) and one extra trait. In return, the deserializer makes no assumptions about what the type expects.</p>
+<h3 id="generalizing-serialize-and-deserialize-properly"><a class="header" href="#generalizing-serialize-and-deserialize-properly">Generalizing: Serialize and Deserialize, properly</a></h3>
+<p>With the visitor in hand, the two arrows of the diagram now have slightly different shapes.</p>
+<p><strong>Serialize is a push.</strong> The type walks itself and calls vocabulary methods on the serializer in order:</p>
+<pre><code class="language-text">   type ──serialize()──► serializer.start_struct()
+                       ► serializer.field_i32("x", 1)
+                       ► serializer.field_i32("y", 2)
+                       ► serializer.end_struct()
+</code></pre>
+<p>One direction. The serializer is a passive sink that does whatever it is told. That is why real serde’s <code>Serializer</code> trait is “just” ~29 methods — one per model word.</p>
+<p><strong>Deserialize is a pull with callbacks.</strong> The type hands a visitor to the deserializer; the deserializer drives the parse and calls the visitor as it finds each thing:</p>
+<pre><code class="language-text">   type ──deserialize()──► deserializer.deserialize_struct(visitor)
+                                 │
+                                 ▼
+                          (reads bytes, finds a field)
+                                 │
+                                 ▼
+                          visitor.visit_i32_field("x", 1)
+                                 │
+                                 ▼
+                          (reads more bytes, finds another field)
+                                 │
+                                 ▼
+                          visitor.visit_i32_field("y", 2)
+</code></pre>
+<p>Two directions, one indirection. That is why real serde’s <code>Deserializer</code> and <code>Visitor</code> traits together carry many more methods than <code>Serializer</code>: there is a <code>visit_*</code> mirror for almost every <code>serialize_*</code>.</p>
+<p>So the architecture is not perfectly symmetric. The middle vocabulary is shared, but the <em>protocol</em> differs:</p>
+<pre><code class="language-text">                  ──Serialize──►    (push: type talks, format listens)
+   data type                                                          data format
+                  ◄──Deserialize──  (pull + visit: format talks, visitor listens)
+</code></pre>
+<p>Same N + M trick, same model words, same independence between types and formats — just one extra hop on the way home.</p>
 <p>In the next sections we will do the zooming, one arrow at a time.</p>
+<h2 id="going-deeper-a-guided-tour"><a class="header" href="#going-deeper-a-guided-tour">Going deeper: a guided tour</a></h2>
+<p>The mental model in the sections above is enough to read most serde code. What follows is a tour of the details that fill in around that frame — based on <a href="https://youtu.be/BI_bHCGRgMY?si=7tve8MfYQ-bG4LtW">this walkthrough video</a> — the small things that explain why the API is shaped the way it is.</p>
+<h3 id="the-data-model-is-the-only-contract"><a class="header" href="#the-data-model-is-the-only-contract">The data model is the only contract</a></h3>
+<p>Each data format only needs to know about the serde data model. Each data type only needs to know about the serde data model. Neither side ever sees the other; they meet in the middle through method calls on the model’s vocabulary.</p>
+<p>That cashes out concretely in two directions:</p>
+<ul>
+<li><strong>Serialize</strong>: your type <em>projects</em> itself into one of the ~29 model shapes. A <code>NonZeroU64</code> field becomes a <code>u64</code> model call. A <code>Vec&lt;T&gt;</code> becomes a <code>seq</code> of <code>T</code>s. The Rust type, no matter how exotic, picks the closest model shape and emits that. The format on the other side decides how to write the bytes — and may even encode metadata like the struct’s name (XML does, JSON does not).</li>
+<li><strong>Deserialize</strong>: your type <em>declares which model shapes it accepts</em>. A <code>NonZeroU64</code> field says “I can be built from <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code>, …”. When the format actually parses bytes, it calls back through a visitor — <code>visit_u32(7)</code>, <code>visit_str("hello")</code> — and the visitor decides what to do with each call.</li>
+</ul>
+<p>The data model is not a struct of values floating between the two sides. It is a vocabulary of method calls. Bytes flow in, model-method calls come out, and a value gets built inside the visitor’s callbacks.</p>
+<h3 id="one-type-every-format--for-free"><a class="header" href="#one-type-every-format--for-free">One type, every format — for free</a></h3>
+<p>This is the user-facing payoff. Put <code>#[derive(Deserialize)]</code> on a struct once:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Deserialize)]
+struct Config { /* … */ }
+<span class="boring">}</span></code></pre>
+<p>You can now read it from any format crate you depend on:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let c: Config = serde_json::from_str(json)?;
+let c: Config = toml::from_str(toml_text)?;
+let c: Config = bincode::deserialize(bytes)?;
+<span class="boring">}</span></code></pre>
+<p>Each format reads its own bytes, but every one of them funnels through the same model-method calls on your type’s visitor. Add a fourth format crate to <code>Cargo.toml</code> — say <code>serde_yaml</code> — and a fourth reader works instantly. Add a second <code>derive(Deserialize)</code> type and all four formats handle it. That is the N + M leverage you actually feel at the call site.</p>
+<h3 id="cargo-expand-derive-is-not-magic"><a class="header" href="#cargo-expand-derive-is-not-magic"><code>cargo expand</code>: derive is not magic</a></h3>
+<p><code>#[derive(Serialize)]</code> looks magical, but <code>cargo expand</code> lifts the curtain — it runs the macro expansion and prints the generated code. For</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Serialize)]
+struct Foo { a: u64, b: String }
+<span class="boring">}</span></code></pre>
+<p>what comes out is essentially:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl Serialize for Foo {
+    fn serialize&lt;S&gt;(&amp;self, serializer: S) -&gt; Result&lt;S::Ok, S::Error&gt;
+    where
+        S: serde::Serializer,
+    {
+        let mut s = serializer.serialize_struct("Foo", 2)?;
+        s.serialize_field("a", &amp;self.a)?;
+        s.serialize_field("b", &amp;self.b)?;
+        s.end()
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>That is the same shape as our <code>Point::serialize</code> from earlier — just using real serde’s traits. Mapped onto our <code>MiniSerializer</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Mini</th><th>Real serde</th></tr>
+</thead>
+<tbody>
+<tr><td><code>s.start_struct("Point")</code></td><td><code>serializer.serialize_struct("Foo", 2)?</code></td></tr>
+<tr><td><code>s.field_i32("x", self.x)</code></td><td><code>s.serialize_field("a", &amp;self.a)?</code></td></tr>
+<tr><td><code>s.end_struct()</code></td><td><code>s.end()</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Same vocabulary; the macro is a templated code generator.</p>
+<h3 id="the-serialize-trait-in-more-detail"><a class="header" href="#the-serialize-trait-in-more-detail">The <code>Serialize</code> trait, in more detail</a></h3>
+<p>Three production details fill in around the simplified trait from §5.</p>
+<p><strong>The serializer is generic.</strong> Your type’s <code>serialize</code> method takes <code>S: Serializer</code>, not a concrete <code>JsonSerializer</code>. It cannot — must not — know whether bytes will be JSON, TOML, or anything else. Its only contract is “call the right method on <code>S</code>”.</p>
+<p><strong><code>Ok</code> and <code>Error</code> are associated types</strong> that each format picks for itself.</p>
+<ul>
+<li><code>serde_json::to_string</code> sets <code>Ok = String</code> — you get JSON text back.</li>
+<li><code>serde_json::to_writer(file, &amp;value)</code> sets <code>Ok = ()</code> and writes bytes directly into the writer.</li>
+</ul>
+<p>Same trait, two APIs, two <code>Ok</code> types. Streaming straight into an <code>io::Write</code> is what lets you serialize a 200 MB value without building a 200 MB intermediate <code>String</code> in memory. <code>Error</code> is a union of two failure modes: the format itself fails (IO error, value the format cannot represent) or the type called something the format cannot handle. From the caller’s perspective both are “serialization failed”.</p>
+<p><strong>Structs use a nested helper trait.</strong> Our <code>MiniSerializer</code> put <code>start_struct</code> / <code>field_i32</code> / <code>end_struct</code> on one trait. Real serde splits them:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>trait Serializer {
+    type Ok;
+    type Error;
+    type SerializeStruct: SerializeStruct&lt;Ok = Self::Ok, Error = Self::Error&gt;;
+
+    fn serialize_struct(self, name: &amp;'static str, len: usize)
+        -&gt; Result&lt;Self::SerializeStruct, Self::Error&gt;;
+    // … one method per data-model word
+}
+
+trait SerializeStruct {
+    type Ok;
+    type Error;
+
+    fn serialize_field&lt;T: Serialize + ?Sized&gt;(
+        &amp;mut self, key: &amp;'static str, value: &amp;T
+    ) -&gt; Result&lt;(), Self::Error&gt;;
+    fn end(self) -&gt; Result&lt;Self::Ok, Self::Error&gt;;
+    fn skip_field(&amp;mut self, key: &amp;'static str) -&gt; Result&lt;(), Self::Error&gt;;
+}
+<span class="boring">}</span></code></pre>
+<p>Three things to notice:</p>
+<ul>
+<li><strong>Typestate.</strong> You literally cannot call <code>serialize_field</code> until <code>serialize_struct</code> has handed you the helper. The compiler enforces the ordering — no chance to emit a field outside an open struct.</li>
+<li><strong>Recursion.</strong> <code>serialize_field</code> takes <code>value: &amp;T where T: Serialize</code>. The serializer then calls <code>value.serialize(serializer)</code> <em>internally</em>. That is how arbitrarily nested types work: <code>User { address: Address { … } }</code> is just <code>serialize_field</code> calls bottoming out at primitive model words.</li>
+<li><strong><code>skip_field</code></strong> is how <code>#[serde(skip_serializing_if = "…")]</code> is implemented — it omits the field from output entirely instead of writing <code>null</code>.</li>
+</ul>
+<h3 id="attributes-are-mechanical-edits-to-the-generated-code"><a class="header" href="#attributes-are-mechanical-edits-to-the-generated-code">Attributes are mechanical edits to the generated code</a></h3>
+<p>The <code>#[serde(…)]</code> attributes on fields and structs are not deep extensions to the serde data model. Each one is an instruction to the proc-macro that tweaks what the generated impl looks like.</p>
+<pre><code class="language-text">#[serde(skip)] on field `b`
+    drop the `serialize_field("b", …)` line; pass `len = 1` instead of `2`.
+
+#[serde(rename = "user_name")] on field `a`
+    change "a" to "user_name" in the generated `serialize_field` call.
+
+#[serde(skip_serializing_if = "Option::is_none")] on field `b`
+    wrap the `serialize_field` call in `if !Option::is_none(&amp;self.b) { … }`.
+
+#[serde(deny_unknown_fields)] on the struct (deserialize side)
+    remove the `Ignore` variant from the generated `Field` enum, so unknown
+    keys produce an error instead of being silently dropped.
+</code></pre>
+<p>The crate has a long list of these attributes, but the <em>mechanism</em> behind them is uniform. The recipe for understanding any of them is the same: write the struct without the attribute, run <code>cargo expand</code>, add the attribute, run <code>cargo expand</code> again, diff. The change is almost always one or two lines in the generated impl.</p>
+<p>The default for <code>deny_unknown_fields</code> being <em>off</em> is a deliberate choice — forgiving deserialization lets a producer of JSON evolve over time (adding new fields) without breaking consumers that do not know about the new keys. Opt into strict mode only when you want schema enforcement.</p>
+<h3 id="why-the-macro-avoids-"><a class="header" href="#why-the-macro-avoids-">Why the macro avoids <code>?</code></a></h3>
+<p>Read the expanded code closely and you will notice serde’s derive <strong>does not actually use <code>?</code></strong>. It writes out the <code>match</code> directly. The reason is performance.</p>
+<p><code>foo()?</code> desugars to roughly:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match foo() {
+    Ok(v) =&gt; v,
+    Err(e) =&gt; return Err(From::from(e)),  // implicit .into() conversion
+}
+<span class="boring">}</span></code></pre>
+<p>The <code>From::from(e)</code> is what makes <code>?</code> ergonomic — it lets the inner error type differ from the outer one and converts on the way out. But it generates code: a function call (not always inlined) and a branch the optimizer has to reason about. Multiply that by every <code>?</code> in a derived impl, across hundreds of types in a real crate, and the binary grows.</p>
+<p>In serde’s generated impls, the inner and outer error types are <em>identical</em> — both are <code>S::Error</code>. So <code>From::from</code> is a no-op semantically, but emitting it still costs binary size. The macro skips <code>?</code> and writes the <code>match</code> explicitly, generating tighter code. Derive macros are not only for ergonomics; they are for picking the fastest expansion.</p>
+<h3 id="the-de-lifetime-zero-copy-vs-owned"><a class="header" href="#the-de-lifetime-zero-copy-vs-owned">The <code>'de</code> lifetime: zero-copy vs. owned</a></h3>
+<p><code>Deserialize</code> has a lifetime parameter that <code>Serialize</code> does not:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait Deserialize&lt;'de&gt;: Sized {
+    fn deserialize&lt;D: Deserializer&lt;'de&gt;&gt;(d: D) -&gt; Result&lt;Self, D::Error&gt;;
+}
+<span class="boring">}</span></code></pre>
+<p><code>'de</code> is the lifetime of the <strong>input bytes</strong> the deserializer is reading from. It exists because deserialization, unlike serialization, has a choice to make: do the values you build <em>borrow</em> from the input buffer, or do they <em>own</em> their bytes?</p>
+<p>Two regimes capture the choice:</p>
+<ul>
+<li><strong>Input lives in memory</strong> (e.g. <code>serde_json::from_str(s: &amp;str)</code>): the deserializer can hand back <code>&amp;'de str</code> and <code>&amp;'de [u8]</code> borrows into <code>s</code>. No allocation, no copy — the produced values share memory with the input. This is zero-copy deserialization.</li>
+<li><strong>Input is streamed</strong> (e.g. <code>from_reader(file)</code>): bytes arrive in chunks into a transient buffer that gets overwritten. The deserializer cannot hand out references into it — by the time the caller looks, the bytes are gone. Everything must be owned (<code>String</code>, <code>Vec&lt;u8&gt;</code>). The <code>'de</code> lifetime for streaming readers is effectively <code>'static</code>.</li>
+</ul>
+<p>A practical consequence: <code>from_str</code> can deserialize a struct with a <code>&amp;str</code> field; <code>from_reader</code> cannot. If you want both, use <code>Cow&lt;'de, str&gt;</code> — it becomes <code>Cow::Borrowed</code> when the deserializer can share input bytes, and <code>Cow::Owned</code> when it cannot.</p>
+<p>This is the deepest reason <code>Deserialize</code> is heavier than <code>Serialize</code>. Serialization only reads <code>&amp;self</code> — there is no buffer to share, no lifetime to thread. Deserialization has the extra degree of freedom, and <code>'de</code> is how the type system expresses it.</p>
+<h3 id="the-deserialization-handshake"><a class="header" href="#the-deserialization-handshake">The deserialization handshake</a></h3>
+<p>Real deserialization is a back-and-forth between the type and the format, mediated by a visitor:</p>
+<pre><code class="language-text">type     → "the next thing in the bytes is a sequence; here is my visitor"
+format   → (reads bytes) "I found a sequence, here is the first element..."
+visitor  → (collects element) "ok, give me the next"
+format   → "I found the second element..."
+…
+format   → "the sequence is over"
+visitor  → "here is your final Vec&lt;T&gt;"
+</code></pre>
+<p>Concretely, the type calls something like <code>deserializer.deserialize_seq(my_visitor)</code>. The deserializer reads bytes, and when it finds a sequence, calls <code>my_visitor.visit_seq(...)</code>. The visitor pulls elements one by one and assembles the value.</p>
+<p>Two design details worth knowing:</p>
+<ul>
+<li><strong>Every deserializer method consumes <code>self</code>.</strong> Not <code>&amp;mut self</code> — <code>self</code>. That is the same typestate trick <code>SerializeStruct</code> uses. Once you have stated an expectation (<code>deserialize_seq</code>), you no longer hold the deserializer; control passes to the visitor. The compiler prevents “I expected a u16 <em>and</em> a string on the same deserializer.”</li>
+<li><strong><code>deserialize_*</code> is a hint, not a contract.</strong> If you call <code>deserializer.deserialize_bytes(visitor)</code> but the format actually has a string in the bytes, the format may still call <code>visitor.visit_str(...)</code> — and let the visitor decide whether to accept it. That is why <code>Vec&lt;u8&gt;</code> works whether the source encodes bytes as a JSON array of numbers, a base64 string, or raw bytes: the visitor implements <code>visit_*</code> for every shape it knows how to absorb.</li>
+</ul>
+<p>The choreography looks elaborate compared to <code>Serialize</code>, but it is exactly the asymmetry the earlier “confession” section called out: writing a key is trivial; reading and routing one is real work. The visitor + <code>'de</code> lifetime + consume-<code>self</code> protocol is the price of doing that work safely.</p>
+<h3 id="serde-attributes"><a class="header" href="#serde-attributes">serde Attributes</a></h3>
+<p>see this <a href="https://serde.rs/attributes.html">link</a></p>
 
                     </main>
 
