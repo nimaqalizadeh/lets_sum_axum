@@ -11,3 +11,6 @@
     - [Socket programming patterns](./01_2_5.socket_patterns.md)
     - [Asynchronous I/O](./01_2_6.async_io.md)
     - [How this maps back to Axum](./01_2_7.axum_mapping.md)
+
+- [Middle wares](./02.middlewares.md)
+- [serde](./03.serde.md)
