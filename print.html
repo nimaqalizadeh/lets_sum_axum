@@ -16,8 +16,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c84ac1b2.js";
+            window.path_to_searchindex_js = "searchindex-dd65425c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-83f4a4ad.js"></script>
+        <script src="toc-705a990c.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -3172,6 +3172,25 @@ visitor  → "here is your final Vec&lt;T&gt;"
 <p>The choreography looks elaborate compared to <code>Serialize</code>, but it is exactly the asymmetry the earlier “confession” section called out: writing a key is trivial; reading and routing one is real work. The visitor + <code>'de</code> lifetime + consume-<code>self</code> protocol is the price of doing that work safely.</p>
 <h3 id="serde-attributes"><a class="header" href="#serde-attributes">serde Attributes</a></h3>
 <p>see this <a href="https://serde.rs/attributes.html">link</a></p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="axum-by-jonhoo"><a class="header" href="#axum-by-jonhoo">Axum by Jonhoo</a></h1>
+<h2 id="foundations-and-ecosystem"><a class="header" href="#foundations-and-ecosystem">Foundations and ecosystem</a></h2>
+<p>Axum is built on top of <a href="https://hyper.rs/">Hyper</a>, which handles the
+protocol-level HTTP concerns (parsing requests, writing responses, connection
+management, HTTP/1 and HTTP/2 support). Axum itself sits one layer above and
+focuses on the web framework experience: routing, handlers, extractors, and so
+on.</p>
+<p>A defining choice in Axum’s design is that it leans heavily on the existing
+Rust ecosystem rather than reinventing things internally:</p>
+<ul>
+<li><strong>Hyper</strong> — all HTTP protocol handling.</li>
+<li><strong>Tower</strong> — middleware, service composition, timeouts, retries, rate
+limiting, and anything else that fits the <code>Service</code> abstraction.</li>
+<li><strong>Tracing</strong> — structured logging and diagnostics.</li>
+</ul>
+<p>This means an Axum app is largely a thin glue layer over crates that are
+already battle-tested elsewhere, and skills you learn in one part of the
+ecosystem (e.g. Tower middleware) carry over directly.</p>
 
                     </main>
 
@@ -3205,11 +3224,11 @@ visitor  → "here is your final Vec&lt;T&gt;"
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
 

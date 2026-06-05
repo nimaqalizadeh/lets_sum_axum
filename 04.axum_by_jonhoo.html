@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Deeper on methods - Let&#x27;s sum Axum</title>
+        <title>Axum by Jonhoo - Let&#x27;s sum Axum</title>
 
 
         <!-- Custom HTML head -->
@@ -174,262 +174,33 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <pre class="playground"><code class="language-rust">use axum::{
-    routing::{get, post},
-    http::StatusCode,
-    Json, Router,
-};
-use serde::{Deserialize, Serialize};
-
-#[tokio::main]
-async fn main() {
-    // initialize tracing
-    tracing_subscriber::fmt::init();
-
-    // build our application with a route
-    let app = Router::new()
-        // `GET /` goes to `root`
-        .route("/", get(root))
-        // `POST /users` goes to `create_user`
-        .route("/users", post(create_user));
-
-    // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
-}
-
-// basic handler that responds with a static string
-async fn root() -&gt; &amp;'static str {
-    "Hello, World!"
-}
-
-async fn create_user(
-    // this argument tells axum to parse the request body
-    // as JSON into a `CreateUser` type
-    Json(payload): Json&lt;CreateUser&gt;,
-) -&gt; (StatusCode, Json&lt;User&gt;) {
-    // insert your application logic here
-    let user = User {
-        id: 1337,
-        username: payload.username,
-    };
-
-    // this will be converted into a JSON response
-    // with a status code of `201 Created`
-    (StatusCode::CREATED, Json(user))
-}
-
-// the input to our `create_user` handler
-#[derive(Deserialize)]
-struct CreateUser {
-    username: String,
-}
-
-// the output to our `create_user` handler
-#[derive(Serialize)]
-struct User {
-    id: u64,
-    username: String,
-}</code></pre>
-<h1 id="deeper-on-methods"><a class="header" href="#deeper-on-methods">Deeper on methods</a></h1>
-<p>Deeper on methods (http verbs) for example <code>get</code>:
-The <code>get</code> signature is like this:</p>
-<pre><code>```rust
-pub fn get&lt;H, T, S&gt;(handler: H) -&gt; MethodRouter&lt;S, Infallible&gt;
-where
-    H: Handler&lt;T, S&gt;,
-    T: 'static,
-    S: Clone + Send + Sync + 'static,
-```
-</code></pre>
-<p>In axum a “handler” is an async function that accepts zero or more “extractors” as arguments and returns something that can be converted into a response (<code>IntoResponse</code> trait).</p>
-<p>Handlers are where your application logic lives and axum applications are built by routing between handlers.</p>
-<p>For a function to be used as a handler it must implement the Handler trait. axum provides blanket implementations for functions that:</p>
+                        <h1 id="axum-by-jonhoo"><a class="header" href="#axum-by-jonhoo">Axum by Jonhoo</a></h1>
+<h2 id="foundations-and-ecosystem"><a class="header" href="#foundations-and-ecosystem">Foundations and ecosystem</a></h2>
+<p>Axum is built on top of <a href="https://hyper.rs/">Hyper</a>, which handles the
+protocol-level HTTP concerns (parsing requests, writing responses, connection
+management, HTTP/1 and HTTP/2 support). Axum itself sits one layer above and
+focuses on the web framework experience: routing, handlers, extractors, and so
+on.</p>
+<p>A defining choice in Axum’s design is that it leans heavily on the existing
+Rust ecosystem rather than reinventing things internally:</p>
 <ul>
-<li>Are async fns.</li>
-<li>Take no more than 16 arguments that all implement Send.</li>
-<li>All except the last argument implement FromRequestParts.</li>
-<li>The last argument implements FromRequest.</li>
-<li>Returns something that implements IntoResponse.</li>
-<li>If a closure is used it must implement Clone + Send and be ’static.</li>
-<li>Returns a future that is Send. The most common way to accidentally make a future !Send is to hold a !Send type across an await.</li>
+<li><strong>Hyper</strong> — all HTTP protocol handling.</li>
+<li><strong>Tower</strong> — middleware, service composition, timeouts, retries, rate
+limiting, and anything else that fits the <code>Service</code> abstraction.</li>
+<li><strong>Tracing</strong> — structured logging and diagnostics.</li>
 </ul>
-<p>Let’s drill the <code>get</code> method down step by step:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub trait IntoResponse {
-    // Required method
-    fn into_response(self) -&gt; Response&lt;Body&gt;;
-}
-<span class="boring">}</span></code></pre>
-<p>And the Response is:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>#[derive(Clone)]
-pub struct Response&lt;T&gt; {
-    head: Parts,
-    body: T,
-}
-<span class="boring">}</span></code></pre>
-<p>Let’s see Parts:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// The HTTP response head consists of a status, version, and a set of
-/// header fields.
-#[derive(Clone)]
-pub struct Parts {
-    /// The response's status
-    pub status: StatusCode,
-
-    /// The response's version
-    pub version: Version,
-
-    /// The response's headers
-    pub headers: HeaderMap&lt;HeaderValue&gt;,
-
-    /// The response's extensions
-    pub extensions: Extensions,
-
-    _priv: (),
-}
-<span class="boring">}</span></code></pre>
-<p>Let’s see <code>StatusCode</code>:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct StatusCode(NonZeroU16);
-
-//std::num::NonZeroU16 -&gt; NonZeroU16 is guaranteed to have the same layout and bit validity as u16 with the exception that 0 is not a valid instance
-
-impl StatusCode {
-// https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
-//...
-    /// Check if status is within 200-299.
-    #[inline]
-    pub fn is_success(&amp;self) -&gt; bool {
-        (200..300).contains(&amp;self.0.get())
-    }
-
-    /// Check if status is within 300-399.
-    #[inline]
-    pub fn is_redirection(&amp;self) -&gt; bool {
-        (300..400).contains(&amp;self.0.get())
-    }
-//...
-
-}
-<span class="boring">}</span></code></pre>
-<p>To see the complete implementation click <a href="https://docs.rs/http/latest/src/http/status.rs.html">here</a></p>
-<p>Let’s see the Version:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// Represents a version of the HTTP spec.
-#[derive(PartialEq, PartialOrd, Copy, Clone, Eq, Ord, Hash)]
-pub struct Version(Http);
-
-impl Version {
-    /// `HTTP/0.9`
-    pub const HTTP_09: Version = Version(Http::Http09);
-
-    /// `HTTP/1.0`
-    pub const HTTP_10: Version = Version(Http::Http10);
-
-    /// `HTTP/1.1`
-    pub const HTTP_11: Version = Version(Http::Http11);
-
-    /// `HTTP/2.0`
-    pub const HTTP_2: Version = Version(Http::H2);
-
-    /// `HTTP/3.0`
-    pub const HTTP_3: Version = Version(Http::H3);
-}
-
-#[derive(PartialEq, PartialOrd, Copy, Clone, Eq, Ord, Hash)]
-enum Http {
-    Http09,
-    Http10,
-    Http11,
-    H2,
-    H3,
-    __NonExhaustive,
-}
-<span class="boring">}</span></code></pre>
-<p>Full implementation is <a href="https://docs.rs/http/latest/src/http/version.rs.html">here</a></p>
-<p>The <code>HeaderMap</code> is a struct see <a href="https://docs.rs/http/latest/src/http/header/map.rs.html">here</a>:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>#[derive(Clone)]
-pub struct HeaderMap&lt;T = HeaderValue&gt; {
-    // Used to mask values to get an index
-    mask: Size,
-    indices: Box&lt;[Pos]&gt;,
-    entries: Vec&lt;Bucket&lt;T&gt;&gt;,
-    extra_values: Vec&lt;ExtraValue&lt;T&gt;&gt;,
-    danger: Danger,
-}
-<span class="boring">}</span></code></pre>
-<p>And finally <code>Extensions</code> <a href="https://docs.rs/http/latest/src/http/extensions.rs.html">here</a>.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>/// `Extensions` can be used by `Request` and `Response` to store extra data derived from the underlying protocol.
-
-#[derive(Clone, Default)]
-pub struct Extensions {
-    // If extensions are never used, no need to carry around an empty HashMap.
-    // That's 3 words. Instead, this is only 1 word.
-    map: Option&lt;Box&lt;AnyMap&gt;&gt;,
-}
-<span class="boring">}</span></code></pre>
-<p>Now should talk about the remainig parts</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub fn get&lt;H, T, S&gt;(handler: H) -&gt; MethodRouter&lt;S, Infallible&gt;
-where
-    H: Handler&lt;T, S&gt;,
-    T: 'static,
-    S: Clone + Send + Sync + 'static,
-<span class="boring">}</span></code></pre>
-<p><code>MethodRouter</code> is</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>#[must_use]
-pub struct MethodRouter&lt;S = (), E = Infallible&gt; {
-    get: MethodEndpoint&lt;S, E&gt;,
-    head: MethodEndpoint&lt;S, E&gt;,
-    delete: MethodEndpoint&lt;S, E&gt;,
-    options: MethodEndpoint&lt;S, E&gt;,
-    patch: MethodEndpoint&lt;S, E&gt;,
-    post: MethodEndpoint&lt;S, E&gt;,
-    put: MethodEndpoint&lt;S, E&gt;,
-    trace: MethodEndpoint&lt;S, E&gt;,
-    connect: MethodEndpoint&lt;S, E&gt;,
-    fallback: Fallback&lt;S, E&gt;,
-    allow_header: AllowHeader,
-}
-// ...
-enum MethodEndpoint&lt;S, E&gt; {
-    None,
-    Route(Route&lt;E&gt;),
-    BoxedHandler(BoxedIntoRoute&lt;S, E&gt;),
-}
-<span class="boring">}</span></code></pre>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum Infallible {}
-<span class="boring">}</span></code></pre>
-<p>This enum has the same role as the ! “never” type, which is unstable in this version of Rust. When ! is stabilized, we plan to make Infallible a type alias to it:</p>
+<p>This means an Axum app is largely a thin glue layer over crates that are
+already battle-tested elsewhere, and skills you learn in one part of the
+ecosystem (e.g. Tower middleware) carry over directly.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="01.router_and_handler.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="03.serde.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="01_2.under_the_hood.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
-                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -437,13 +208,10 @@ enum MethodEndpoint&lt;S, E&gt; {
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="01.router_and_handler.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="03.serde.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="01_2.under_the_hood.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
-                    </a>
             </nav>
 
         </div>
